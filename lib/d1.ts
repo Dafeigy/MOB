@@ -1,0 +1,73 @@
+type D1Param = string | number | null
+
+type D1Result<T> = {
+  results?: T[]
+  success?: boolean
+  meta?: {
+    changes?: number
+    last_row_id?: number
+  }
+}
+
+type D1Response<T> = {
+  success: boolean
+  result?: D1Result<T>[]
+  errors?: Array<{ code: number; message: string }>
+}
+
+export type D1Statement = {
+  sql: string
+  params?: D1Param[]
+}
+
+function getD1Config() {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
+  const databaseId = process.env.CLOUDFLARE_D1_DATABASE_ID
+  const apiToken = process.env.CLOUDFLARE_D1_API_TOKEN
+
+  if (!accountId || !databaseId || !apiToken) return null
+
+  return { accountId, databaseId, apiToken }
+}
+
+export function isD1Configured() {
+  return Boolean(getD1Config())
+}
+
+async function requestD1<T>(body: D1Statement | { batch: D1Statement[] }) {
+  const config = getD1Config()
+  if (!config) {
+    throw new Error("D1_NOT_CONFIGURED")
+  }
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/d1/database/${config.databaseId}/query`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.apiToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    },
+  )
+
+  const payload = (await response.json()) as D1Response<T>
+
+  if (!response.ok || !payload.success || payload.result?.some((item) => !item.success)) {
+    const message = payload.errors?.map((error) => error.message).join("; ")
+    throw new Error(message || `D1 query failed with status ${response.status}`)
+  }
+
+  return payload.result ?? []
+}
+
+export async function d1Query<T>(sql: string, params: D1Param[] = []) {
+  const result = await requestD1<T>({ sql, params })
+  return result[0]?.results ?? []
+}
+
+export async function d1Batch(statements: D1Statement[]) {
+  return requestD1<unknown>({ batch: statements })
+}

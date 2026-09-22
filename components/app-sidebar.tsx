@@ -1,0 +1,128 @@
+"use client"
+
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import {
+  AlertTriangleIcon,
+  BoxesIcon,
+  CircuitBoardIcon,
+  LayoutDashboardIcon,
+  LogOutIcon,
+  PackagePlusIcon,
+  SettingsIcon,
+} from "lucide-react"
+
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+} from "@/components/ui/sidebar"
+
+const navigation = [
+  { title: "总览", href: "/dashboard", icon: LayoutDashboardIcon },
+  { title: "元件库存", href: "/components", icon: BoxesIcon },
+  { title: "出入库", href: "/movements", icon: PackagePlusIcon },
+  { title: "库存提醒", href: "/alerts", icon: AlertTriangleIcon, badge: "!" },
+]
+
+export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+  const pathname = usePathname()
+  const router = useRouter()
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" })
+    router.replace("/login")
+    router.refresh()
+  }
+
+  return (
+    <Sidebar collapsible="icon" {...props}>
+      <SidebarHeader className="p-3">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              size="lg"
+              render={<Link href="/dashboard" />}
+              className="cursor-pointer hover:bg-transparent active:bg-transparent"
+            >
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#102019] text-emerald-300">
+                <CircuitBoardIcon className="size-4" />
+              </span>
+              <span className="grid flex-1 text-left leading-tight">
+                <span className="font-semibold tracking-[-0.02em]">Retos</span>
+                <span className="text-xs text-muted-foreground">元件库存管理</span>
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>工作台</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navigation.map((item) => {
+                const Icon = item.icon
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      tooltip={item.title}
+                      isActive={pathname === item.href}
+                      render={<Link href={item.href} />}
+                      className="cursor-pointer"
+                    >
+                      <Icon />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                    {item.badge ? (
+                      <SidebarMenuBadge className="text-amber-700">
+                        {item.badge}
+                      </SidebarMenuBadge>
+                    ) : null}
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter className="p-3">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="设置"
+              isActive={pathname === "/settings"}
+              render={<Link href="/settings" />}
+              className="cursor-pointer"
+            >
+              <SettingsIcon />
+              <span>系统设置</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="退出登录"
+              onClick={logout}
+              className="cursor-pointer text-muted-foreground hover:text-foreground"
+            >
+              <LogOutIcon />
+              <span>退出登录</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
+  )
+}
