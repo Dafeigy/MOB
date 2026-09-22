@@ -61,4 +61,8 @@ npx tsc --noEmit
 npm run build
 ```
 
+## Vercel 部署
+
+项目已包含 `vercel.json` 和 `.vercelignore`。完整的 Vercel 导入步骤、Cloudflare D1 准备、环境变量配置和上线检查请见 [`DEPLOYMENT.md`](./DEPLOYMENT.md)。
+
 数据库表结构位于 [`scripts/d1-schema.sql`](./scripts/d1-schema.sql)，环境变量示例位于 [`.env.example`](./.env.example)。

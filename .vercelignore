@@ -1,0 +1,11 @@
+# Local dependencies and build artifacts
+node_modules
+.next
+out
+coverage
+*.tsbuildinfo
+*.log
+
+# Local secrets must never be uploaded by the Vercel CLI
+.env
+.env.*
