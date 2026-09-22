@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useInventoryActions, actionError } from "@/components/inventory-actions"
 import { LoaderCircleIcon, PlusIcon, TagIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -19,7 +19,7 @@ const fields = [
 ] as const
 
 export function AddComponentDialog({ categories }: { categories: string[] }) {
-  const router = useRouter()
+  const actions = useInventoryActions()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState("")
@@ -58,16 +58,10 @@ export function AddComponentDialog({ categories }: { categories: string[] }) {
     const data = Object.fromEntries(new FormData(event.currentTarget))
     data.category = category
     try {
-      const response = await fetch("/api/components", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
-      const result = (await response.json()) as { message?: string }
-      if (!response.ok) {
-        setMessage(result.message ?? "保存失败。")
-        return
-      }
+      await actions.createComponent(data)
       closeDialog(false)
-      router.refresh()
-    } catch {
-      setMessage("网络连接失败，请稍后重试。")
+    } catch (error) {
+      setMessage(actionError(error))
     } finally {
       setPending(false)
     }

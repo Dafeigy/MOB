@@ -11,8 +11,9 @@ CREATE TABLE IF NOT EXISTS components (
   location TEXT NOT NULL,
   notes TEXT NOT NULL DEFAULT '',
   unit_price REAL CHECK (unit_price >= 0),
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  deleted_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS stock_movements (
@@ -21,7 +22,7 @@ CREATE TABLE IF NOT EXISTS stock_movements (
   type TEXT NOT NULL CHECK (type IN ('in', 'out', 'adjustment')),
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   note TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE CASCADE
 );
 

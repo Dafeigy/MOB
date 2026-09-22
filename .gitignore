@@ -19,6 +19,12 @@
 
 # production
 /build
+/dist-desktop/
+/src-tauri/target/
+/src-tauri/gen/
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
 
 # misc
 .DS_Store

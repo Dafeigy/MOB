@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 const PAGE_SIZE_KEY = "retos-inventory-page-size"
-const PAGE_SIZES = [10, 15, 20] as const
+const PAGE_SIZES = [5, 10, 15, 20] as const
 
 export function InventoryPageSizeSetting() {
   const [pageSize, setPageSize] = useState(15)

@@ -1,6 +1,5 @@
 "use client"
 
-import { usePathname } from "next/navigation"
 
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -14,8 +13,7 @@ const pageTitles: Record<string, { title: string; description: string }> = {
   "/settings": { title: "系统设置", description: "检查登录与数据库连接状态" },
 }
 
-export function WorkspaceHeader() {
-  const pathname = usePathname()
+export function WorkspaceHeader({ pathname }: { pathname: string }) {
   const page = pageTitles[pathname] ?? pageTitles["/dashboard"]
 
   return (

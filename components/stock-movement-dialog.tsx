@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useInventoryActions, actionError } from "@/components/inventory-actions"
 import { ImportIcon, ArrowUpRight, LoaderCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -17,12 +17,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import type { ComponentItem } from "@/lib/inventory"
+import type { ComponentItem } from "@/lib/inventory-types"
 
 type MovementType = "in" | "out"
 
 export function StockMovementDialog({ item, type }: { item: ComponentItem; type: MovementType }) {
-  const router = useRouter()
+  const actions = useInventoryActions()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState("")
@@ -42,20 +42,10 @@ export function StockMovementDialog({ item, type }: { item: ComponentItem; type:
     const data = Object.fromEntries(new FormData(event.currentTarget))
 
     try {
-      const response = await fetch("/api/movements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, componentId: item.id, type }),
-      })
-      const result = (await response.json()) as { message?: string }
-      if (!response.ok) {
-        setMessage(result.message ?? `${label}失败，请稍后重试。`)
-        return
-      }
+      await actions.createMovement({ ...data, componentId: item.id, type })
       changeOpen(false)
-      router.refresh()
-    } catch {
-      setMessage("网络连接失败，请稍后重试。")
+    } catch (error) {
+      setMessage(actionError(error))
     } finally {
       setPending(false)
     }

@@ -71,3 +71,22 @@ export async function d1Query<T>(sql: string, params: D1Param[] = []) {
 export async function d1Batch(statements: D1Statement[]) {
   return requestD1<unknown>({ batch: statements })
 }
+
+let syncSchema: Promise<void> | undefined
+
+// Upgrade existing D1 databases without losing rows. A concurrent desktop migration is harmless.
+export function ensureSyncSchema() {
+  syncSchema ??= (async () => {
+    const columns = await d1Query<{ name: string }>("PRAGMA table_info(components)")
+    if (!columns.length) throw new Error("D1_SCHEMA_NOT_INITIALIZED")
+    if (!columns.some((column) => column.name === "deleted_at")) {
+      try {
+        await d1Query("ALTER TABLE components ADD COLUMN deleted_at TEXT")
+      } catch (error) {
+        const refreshed = await d1Query<{ name: string }>("PRAGMA table_info(components)")
+        if (!refreshed.some((column) => column.name === "deleted_at")) throw error
+      }
+    }
+  })().catch((error) => { syncSchema = undefined; throw error })
+  return syncSchema
+}
