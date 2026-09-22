@@ -1,28 +1,7 @@
-import { d1Batch, d1Query, isD1Configured } from "@/lib/d1"
+import { d1Batch, d1Query, isD1Configured, ensureSyncSchema } from "@/lib/d1"
 
-export type ComponentItem = {
-  id: string
-  name: string
-  category: string
-  package: string
-  value: string
-  quantity: number
-  min_quantity: number | null
-  location: string
-  notes: string
-  unit_price: number | null
-  updated_at: string
-}
-
-export type StockMovement = {
-  id: string
-  component_id: string
-  component_name: string
-  type: "in" | "out" | "adjustment"
-  quantity: number
-  note: string
-  created_at: string
-}
+import { inventoryOverview, type ComponentItem, type StockMovement, type NewComponent } from "@/lib/inventory-types"
+export type { ComponentItem, StockMovement, NewComponent } from "@/lib/inventory-types"
 
 const demoComponents: ComponentItem[] = [
   {
@@ -144,18 +123,23 @@ const demoMovements: StockMovement[] = [
   },
 ]
 
+// Keep versions monotonic even when successive writes occur in the same millisecond.
+const nextVersion = "strftime('%Y-%m-%dT%H:%M:%fZ', max(julianday('now'), julianday(updated_at, '+0.001 seconds')))"
+
 function isLegacyComponentsSchema(error: unknown) {
   return error instanceof Error && /(?:no such column|has no column named)\s*:?\s*(?:components\.)?notes/i.test(error.message)
 }
 
 export async function getComponents() {
   if (!isD1Configured()) return demoComponents
+  await ensureSyncSchema()
 
   try {
     return await d1Query<ComponentItem>(`
       SELECT id, name, category, package, value, quantity, min_quantity,
              location, notes, unit_price, updated_at
       FROM components
+      WHERE deleted_at IS NULL
       ORDER BY name COLLATE NOCASE
     `)
   } catch (error) {
@@ -165,6 +149,7 @@ export async function getComponents() {
       SELECT id, name, category, package, value, quantity, min_quantity,
              location, manufacturer AS notes, unit_price, updated_at
       FROM components
+      WHERE deleted_at IS NULL
       ORDER BY name COLLATE NOCASE
     `)
   }
@@ -172,12 +157,14 @@ export async function getComponents() {
 
 export async function getRecentMovements(limit = 10) {
   if (!isD1Configured()) return demoMovements.slice(0, limit)
+  await ensureSyncSchema()
 
   return d1Query<StockMovement>(
     `SELECT m.id, m.component_id, c.name || ' · ' || c.value AS component_name,
             m.type, m.quantity, m.note, m.created_at
      FROM stock_movements m
      JOIN components c ON c.id = m.component_id
+     WHERE c.deleted_at IS NULL
      ORDER BY m.created_at DESC
      LIMIT ?`,
     [limit],
@@ -187,40 +174,12 @@ export async function getRecentMovements(limit = 10) {
 export async function getInventoryOverview() {
   const components = await getComponents()
   const recentMovements = await getRecentMovements(5)
-  const totalUnits = components.reduce((sum, item) => sum + item.quantity, 0)
-  const lowStock = components.filter(
-    (item) => item.min_quantity !== null && item.quantity <= item.min_quantity,
-  )
-  const inventoryValue = components.reduce(
-    (sum, item) => sum + item.quantity * (item.unit_price ?? 0),
-    0,
-  )
-
-  const categories = Array.from(
-    components.reduce((map, item) => {
-      map.set(item.category, (map.get(item.category) ?? 0) + item.quantity)
-      return map
-    }, new Map<string, number>()),
-  )
-    .map(([name, quantity]) => ({ name, quantity }))
-    .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, 5)
-
-  return {
-    totalKinds: components.length,
-    totalUnits,
-    lowStock,
-    inventoryValue,
-    categories,
-    recentMovements,
-    demoMode: !isD1Configured(),
-  }
+  return inventoryOverview(components, recentMovements, !isD1Configured())
 }
-
-export type NewComponent = Omit<ComponentItem, "id" | "updated_at">
 
 export async function createComponent(input: NewComponent) {
   if (!isD1Configured()) throw new Error("D1_NOT_CONFIGURED")
+  await ensureSyncSchema()
 
   const id = crypto.randomUUID()
   const params = [id, input.name, input.category, input.package, input.value, input.quantity, input.min_quantity, input.location, input.notes, input.unit_price]
@@ -229,7 +188,7 @@ export async function createComponent(input: NewComponent) {
       `INSERT INTO components (
         id, name, category, package, value, quantity, min_quantity, location,
         notes, unit_price, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
       params,
     )
   } catch (error) {
@@ -238,7 +197,7 @@ export async function createComponent(input: NewComponent) {
       `INSERT INTO components (
         id, name, category, package, value, quantity, min_quantity, location,
         manufacturer, unit_price, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
       [...params.slice(0, 8), input.notes, input.unit_price ?? 0],
     )
   }
@@ -247,20 +206,21 @@ export async function createComponent(input: NewComponent) {
 
 export async function updateComponent(id: string, input: NewComponent) {
   if (!isD1Configured()) throw new Error("D1_NOT_CONFIGURED")
+  await ensureSyncSchema()
   const params = [input.name, input.category, input.package, input.value, input.quantity, input.min_quantity, input.location, input.notes, input.unit_price, id]
   try {
     await d1Query(
       `UPDATE components SET name = ?, category = ?, package = ?, value = ?, quantity = ?,
-       min_quantity = ?, location = ?, notes = ?, unit_price = ?, updated_at = datetime('now')
-       WHERE id = ?`,
+       min_quantity = ?, location = ?, notes = ?, unit_price = ?, updated_at = ${nextVersion}
+       WHERE id = ? AND deleted_at IS NULL`,
       params,
     )
   } catch (error) {
     if (!isLegacyComponentsSchema(error)) throw error
     await d1Query(
       `UPDATE components SET name = ?, category = ?, package = ?, value = ?, quantity = ?,
-       min_quantity = ?, location = ?, manufacturer = ?, unit_price = ?, updated_at = datetime('now')
-       WHERE id = ?`,
+       min_quantity = ?, location = ?, manufacturer = ?, unit_price = ?, updated_at = ${nextVersion}
+       WHERE id = ? AND deleted_at IS NULL`,
       params,
     )
   }
@@ -268,7 +228,8 @@ export async function updateComponent(id: string, input: NewComponent) {
 
 export async function deleteComponent(id: string) {
   if (!isD1Configured()) throw new Error("D1_NOT_CONFIGURED")
-  await d1Query("DELETE FROM components WHERE id = ?", [id])
+  await ensureSyncSchema()
+  await d1Query(`UPDATE components SET deleted_at = ${nextVersion}, updated_at = ${nextVersion} WHERE id = ? AND deleted_at IS NULL`, [id])
 }
 
 export async function createMovement(input: {
@@ -278,9 +239,10 @@ export async function createMovement(input: {
   note: string
 }) {
   if (!isD1Configured()) throw new Error("D1_NOT_CONFIGURED")
+  await ensureSyncSchema()
 
   const rows = await d1Query<Pick<ComponentItem, "quantity">>(
-    "SELECT quantity FROM components WHERE id = ? LIMIT 1",
+    "SELECT quantity FROM components WHERE id = ? AND deleted_at IS NULL LIMIT 1",
     [input.componentId],
   )
   const current = rows[0]?.quantity
@@ -291,19 +253,19 @@ export async function createMovement(input: {
 
   await d1Batch([
     {
-      sql: "UPDATE components SET quantity = quantity + ?, updated_at = datetime('now') WHERE id = ?",
+      sql: `UPDATE components SET quantity = quantity + ?, updated_at = ${nextVersion} WHERE id = ? AND deleted_at IS NULL`,
       params: [delta, input.componentId],
     },
     {
       sql: `INSERT INTO stock_movements
             (id, component_id, type, quantity, note, created_at)
-            VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+            SELECT ?, id, ?, ?, ?, updated_at FROM components WHERE id = ? AND deleted_at IS NULL AND changes() > 0`,
       params: [
         crypto.randomUUID(),
-        input.componentId,
         input.type,
         input.quantity,
         input.note,
+        input.componentId,
       ],
     },
   ])

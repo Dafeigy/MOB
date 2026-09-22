@@ -34,13 +34,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import type { ComponentItem } from "@/lib/inventory"
+import type { ComponentItem } from "@/lib/inventory-types"
+
+import { useInventoryActions, actionError } from "@/components/inventory-actions"
 
 const PAGE_SIZE_KEY = "retos-inventory-page-size"
 const DEFAULT_PAGE_SIZE = 15
 const PAGE_SIZES = [10, 15, 20] as const
 
 export function InventoryTable({ items }: { items: ComponentItem[] }) {
+  const actions = useInventoryActions()
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "low">("all")
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
@@ -86,12 +89,9 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
     setRemovingId(item.id)
     setMessage("")
     try {
-      const response = await fetch(`/api/components/${item.id}`, { method: "DELETE" })
-      const result = (await response.json()) as { message?: string }
-      if (!response.ok) setMessage(result.message ?? `未能删除“${item.name}”。`)
-      else window.location.reload()
-    } catch {
-      setMessage("网络连接失败，请稍后重试。")
+      await actions.deleteComponent(item.id)
+    } catch (error) {
+      setMessage(actionError(error))
     } finally {
       setRemovingId(null)
     }
@@ -205,7 +205,7 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
                         <DialogHeader>
                           <DialogTitle>删除元件？</DialogTitle>
                           <DialogDescription>
-                            将永久删除“{item.name} · {item.value}”及其关联库存流水，此操作无法撤销。
+                            将删除“{item.name} · {item.value}”及其关联库存流水。
                           </DialogDescription>
                         </DialogHeader>
                         <DialogFooter>

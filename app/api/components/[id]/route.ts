@@ -25,7 +25,7 @@ export async function PATCH(request: Request, { params }: RouteContext<"/api/com
     quantity: number(body.quantity), min_quantity: optionalNumber(body.minQuantity), location: text(body.location),
     notes: text(body.notes), unit_price: optionalNumber(body.unitPrice),
   }
-  if (!input.name || !input.category || !input.package || input.quantity < 0 || (input.min_quantity !== null && input.min_quantity < 0) || (input.unit_price !== null && input.unit_price < 0) || Object.values(input).some((value) => typeof value === "number" && !Number.isFinite(value))) {
+  if (!input.name || !input.category || !input.package || (!Number.isSafeInteger(input.quantity) || input.quantity < 0) || (input.min_quantity !== null && (!Number.isSafeInteger(input.min_quantity) || input.min_quantity < 0)) || (input.unit_price !== null && input.unit_price < 0) || Object.values(input).some((value) => typeof value === "number" && !Number.isFinite(value))) {
     return Response.json({ message: "请填写完整且有效的元件信息。" }, { status: 400 })
   }
   try {

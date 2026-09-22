@@ -40,8 +40,8 @@ export async function POST(request: Request) {
     !input.name ||
     !input.category ||
     !input.package ||
-    input.quantity < 0 ||
-    (input.min_quantity !== null && input.min_quantity < 0) ||
+    (!Number.isSafeInteger(input.quantity) || input.quantity < 0) ||
+    (input.min_quantity !== null && (!Number.isSafeInteger(input.min_quantity) || input.min_quantity < 0)) ||
     (input.unit_price !== null && input.unit_price < 0) ||
     Object.values(input).some((value) =>
       typeof value === "number" ? !Number.isFinite(value) : false,

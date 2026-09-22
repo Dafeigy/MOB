@@ -1,0 +1,6 @@
+{
+  "identifier": "com.retos.inventory.smoketest",
+  "app": {
+    "windows": [{ "label": "main", "title": "Retos · 验证", "width": 1280, "height": 850, "minWidth": 800, "minHeight": 600 }]
+  }
+}

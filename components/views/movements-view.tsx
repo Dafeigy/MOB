@@ -1,0 +1,84 @@
+"use client"
+
+import {
+  ArrowDownLeftIcon,
+  ArrowUpRightIcon,
+  ClipboardCheckIcon,
+} from "lucide-react"
+
+import { AddMovementDialog } from "@/components/add-movement-dialog"
+import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import type { ComponentItem, StockMovement } from "@/lib/inventory-types"
+
+
+const movementLabel = {
+  in: "入库",
+  out: "出库",
+  adjustment: "盘点",
+}
+
+export function MovementsView({ items, movements }: { items: ComponentItem[]; movements: StockMovement[] }) {
+
+  return (
+    <div className="mx-auto max-w-[1440px] space-y-6">
+      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-[-0.035em]">出入库流水</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            保存后会同步更新元件库存，最近记录优先展示。
+          </p>
+        </div>
+        <AddMovementDialog items={items} />
+      </section>
+
+      <Card className="overflow-hidden border-border py-0 shadow-xs">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>时间</TableHead>
+              <TableHead>元件</TableHead>
+              <TableHead>类型</TableHead>
+              <TableHead>数量</TableHead>
+              <TableHead>备注</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {movements.map((movement) => {
+              const incoming = movement.type !== "out"
+              const Icon = movement.type === "adjustment" ? ClipboardCheckIcon : incoming ? ArrowDownLeftIcon : ArrowUpRightIcon
+              return (
+                <TableRow key={movement.id}>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {movement.created_at.slice(0, 16)}
+                  </TableCell>
+                  <TableCell className="font-medium">{movement.component_name}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={incoming ? "bg-muted text-foreground" : "border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300"}>
+                      <Icon data-icon="inline-start" />
+                      {movementLabel[movement.type]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`font-mono font-semibold ${incoming ? "text-foreground" : "text-orange-700 dark:text-orange-300"}`}>
+                      {incoming ? "+" : "−"}{movement.quantity}
+                    </span>
+                  </TableCell>
+                  <TableCell className="max-w-sm truncate text-muted-foreground">{movement.note || "—"}</TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
+  )
+}

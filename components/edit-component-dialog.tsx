@@ -1,14 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useInventoryActions, actionError } from "@/components/inventory-actions"
 import { LoaderCircleIcon, PencilIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { ComponentItem } from "@/lib/inventory"
+import type { ComponentItem } from "@/lib/inventory-types"
 
 const fields = [
   ["name", "元件名称", true], ["category", "分类", true], ["package", "封装", true], ["value", "参数 / 阻容值", false],
@@ -16,7 +16,7 @@ const fields = [
 ] as const
 
 export function EditComponentDialog({ item }: { item: ComponentItem }) {
-  const router = useRouter()
+  const actions = useInventoryActions()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState("")
@@ -27,13 +27,10 @@ export function EditComponentDialog({ item }: { item: ComponentItem }) {
     setMessage("")
     const data = Object.fromEntries(new FormData(event.currentTarget))
     try {
-      const response = await fetch(`/api/components/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
-      const result = (await response.json()) as { message?: string }
-      if (!response.ok) return setMessage(result.message ?? "保存失败。")
+      await actions.updateComponent(item.id, data)
       setOpen(false)
-      router.refresh()
-    } catch {
-      setMessage("网络连接失败，请稍后重试。")
+    } catch (error) {
+      setMessage(actionError(error))
     } finally {
       setPending(false)
     }

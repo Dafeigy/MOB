@@ -1,8 +1,6 @@
 "use client"
 
-import Image from "next/image"
-import { ProgressLink as Link, useNavigationTransition } from "@/components/navigation-progress"
-import { usePathname, useRouter } from "next/navigation"
+import { NavigationLink as Link } from "@/components/navigation-link"
 import {
   AlertTriangleIcon,
   BoxesIcon,
@@ -34,19 +32,7 @@ const navigation = [
   { title: "库存提醒", href: "/alerts", icon: AlertTriangleIcon, badge: "!" },
 ]
 
-export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
-  const pathname = usePathname()
-  const router = useRouter()
-  const startNavigation = useNavigationTransition()
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" })
-    startNavigation(() => {
-      router.replace("/login")
-      router.refresh()
-    })
-  }
-
+export function AppSidebar({ pathname, onLogout, ...props }: React.ComponentProps<typeof Sidebar> & { pathname: string; onLogout?: () => void }) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="p-3 group-data-[collapsible=icon]:p-2">
@@ -58,13 +44,14 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
               className="cursor-pointer hover:bg-transparent active:bg-transparent"
             >
               <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-[#111111] group-data-[collapsible=icon]:size-8">
-                <Image
+                {/* Shared with the offline desktop; this small local asset needs no image server. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src="/brand/retos-avatar-v2.png"
                   alt=""
                   width={36}
                   height={36}
                   className="size-full object-contain"
-                  unoptimized
                 />
               </span>
               <span className="grid flex-1 text-left leading-tight">
@@ -120,16 +107,18 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
               <span>系统设置</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          {onLogout ? (
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="退出登录"
-              onClick={logout}
+              onClick={onLogout}
               className="cursor-pointer text-muted-foreground hover:text-foreground"
             >
               <LogOutIcon />
               <span>退出登录</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          ) : null}
         </SidebarMenu>
       </SidebarFooter>
       <SidebarRail />
