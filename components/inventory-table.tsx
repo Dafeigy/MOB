@@ -40,7 +40,7 @@ import { useInventoryActions, actionError } from "@/components/inventory-actions
 
 const PAGE_SIZE_KEY = "retos-inventory-page-size"
 const DEFAULT_PAGE_SIZE = 15
-const PAGE_SIZES = [10, 15, 20] as const
+const PAGE_SIZES = [5, 10, 15, 20] as const
 
 export function InventoryTable({ items }: { items: ComponentItem[] }) {
   const actions = useInventoryActions()
