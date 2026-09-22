@@ -43,7 +43,7 @@ export default async function MovementsPage() {
         <AddMovementDialog items={items} />
       </section>
 
-      <Card className="overflow-hidden border-slate-200/80 py-0 shadow-xs">
+      <Card className="overflow-hidden border-border py-0 shadow-xs">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -65,13 +65,13 @@ export default async function MovementsPage() {
                   </TableCell>
                   <TableCell className="font-medium">{movement.component_name}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={incoming ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-orange-200 bg-orange-50 text-orange-800"}>
+                    <Badge variant="outline" className={incoming ? "bg-muted text-foreground" : "border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300"}>
                       <Icon data-icon="inline-start" />
                       {movementLabel[movement.type]}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <span className={`font-mono font-semibold ${incoming ? "text-emerald-700" : "text-orange-700"}`}>
+                    <span className={`font-mono font-semibold ${incoming ? "text-foreground" : "text-orange-700 dark:text-orange-300"}`}>
                       {incoming ? "+" : "−"}{movement.quantity}
                     </span>
                   </TableCell>

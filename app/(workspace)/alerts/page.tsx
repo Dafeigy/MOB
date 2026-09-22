@@ -34,7 +34,7 @@ export default async function AlertsPage() {
             const minimum = item.min_quantity ?? 0
             const ratio = Math.min((item.quantity / Math.max(minimum, 1)) * 100, 100)
             return (
-              <Card key={item.id} className="border-slate-200/80 py-0 shadow-xs">
+              <Card key={item.id} className="border-border py-0 shadow-xs">
                 <CardContent className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
                   <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-amber-50 text-amber-700">
                     <AlertTriangleIcon className="size-5" />
@@ -64,9 +64,9 @@ export default async function AlertsPage() {
           })}
         </div>
       ) : (
-        <Card className="border-slate-200/80 shadow-xs">
+        <Card className="border-border shadow-xs">
           <CardContent className="flex min-h-64 flex-col items-center justify-center text-center">
-            <span className="grid size-12 place-items-center rounded-full bg-emerald-50 text-emerald-700">
+            <span className="grid size-12 place-items-center rounded-2xl bg-muted text-foreground">
               <CheckCircle2Icon className="size-5" />
             </span>
             <h3 className="mt-4 font-medium">库存状态良好</h3>

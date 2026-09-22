@@ -41,7 +41,7 @@ export default function SettingsPage() {
         </p>
       </section>
 
-      <Card className="border-slate-200/80 shadow-xs">
+      <Card className="border-border shadow-xs">
         <CardHeader>
           <CardTitle>配置检查</CardTitle>
         </CardHeader>
@@ -56,20 +56,20 @@ export default function SettingsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{check.label}</p>
-                    <Badge variant="outline" className={check.ready ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}>
+                    <Badge variant="outline" className={check.ready ? "bg-muted text-foreground" : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"}>
                       {check.ready ? "已配置" : "待配置"}
                     </Badge>
                   </div>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">{check.description}</p>
                 </div>
-                {check.ready ? <CheckCircle2Icon className="mt-1 size-5 text-emerald-600" /> : null}
+                {check.ready ? <CheckCircle2Icon className="mt-1 size-5 text-foreground" /> : null}
               </div>
             )
           })}
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200/80 shadow-xs">
+      <Card className="border-border shadow-xs">
         <CardHeader>
           <CardTitle>初始化 D1</CardTitle>
         </CardHeader>

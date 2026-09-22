@@ -46,7 +46,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="p-3">
+      <SidebarHeader className="p-3 group-data-[collapsible=icon]:p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -54,7 +54,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
               render={<Link href="/dashboard" />}
               className="cursor-pointer hover:bg-transparent active:bg-transparent"
             >
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#102019] text-emerald-300">
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground group-data-[collapsible=icon]:size-8">
                 <CircuitBoardIcon className="size-4" />
               </span>
               <span className="grid flex-1 text-left leading-tight">
@@ -97,7 +97,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
+      <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

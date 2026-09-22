@@ -20,7 +20,7 @@ export default async function ComponentsPage() {
         </div>
         <AddComponentDialog categories={categories} />
       </section>
-      <Card className="overflow-hidden border-slate-200/80 py-0 shadow-xs">
+      <Card className="overflow-hidden border-border py-0 shadow-xs">
         <InventoryTable items={items} />
       </Card>
     </div>

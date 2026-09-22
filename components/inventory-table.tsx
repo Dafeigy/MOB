@@ -76,7 +76,7 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="搜索名称、参数、备注或货位…"
             aria-label="搜索元件"
-            className="h-10 rounded-xl border-slate-200 bg-background pl-9 shadow-none focus-visible:ring-emerald-500/25"
+            className="h-10 rounded-xl border-border bg-background pl-9 shadow-none focus-visible:ring-ring/30"
           />
         </div>
         <div className="flex rounded-full border bg-muted/40 p-1">
@@ -116,7 +116,7 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
           {filtered.map((item) => {
             const low = item.min_quantity !== null && item.quantity <= item.min_quantity
             return (
-              <TableRow key={item.id} className="group transition-colors hover:bg-emerald-50/45 dark:hover:bg-emerald-950/15">
+              <TableRow key={item.id} className="group transition-colors hover:bg-muted/50">
                 <TableCell className="w-[14%] text-center">
                   <div className="min-w-28 max-w-48 text-center">
                     <p className="font-medium">{item.name}</p>

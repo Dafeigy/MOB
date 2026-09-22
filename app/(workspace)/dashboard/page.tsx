@@ -31,28 +31,28 @@ export default async function DashboardPage() {
       value: formatNumber(overview.totalKinds),
       note: "已建档的物料",
       icon: Layers3Icon,
-      tone: "bg-slate-100 text-slate-700",
+      tone: "bg-muted text-foreground",
     },
     {
       label: "在库总数",
       value: formatNumber(overview.totalUnits),
       note: "所有可用元件",
       icon: BoxesIcon,
-      tone: "bg-emerald-50 text-emerald-700",
+      tone: "bg-muted text-foreground",
     },
     {
       label: "低库存",
       value: formatNumber(overview.lowStock.length),
       note: "需要尽快补货",
       icon: AlertTriangleIcon,
-      tone: "bg-amber-50 text-amber-700",
+      tone: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
     },
     {
       label: "库存估值",
       value: `¥${overview.inventoryValue.toFixed(2)}`,
       note: "按录入单价估算",
       icon: WalletCardsIcon,
-      tone: "bg-teal-50 text-teal-700",
+      tone: "bg-muted text-foreground",
     },
   ]
 
@@ -60,7 +60,7 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-[1440px] space-y-6">
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="font-mono text-xs tracking-[0.16em] text-emerald-700 uppercase">
+          <p className="font-mono text-xs tracking-[0.16em] text-muted-foreground uppercase">
             Inventory pulse
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">
@@ -77,7 +77,7 @@ export default async function DashboardPage() {
       </section>
 
       {overview.demoMode ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
           <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
           <p>
             当前展示演示数据。填写 Cloudflare D1 环境变量并初始化表结构后，会自动切换为真实库存。
@@ -89,7 +89,7 @@ export default async function DashboardPage() {
         {stats.map((stat) => {
           const Icon = stat.icon
           return (
-            <Card key={stat.label} className="gap-5 border-slate-200/80 py-5 shadow-xs">
+            <Card key={stat.label} className="gap-5 border-border py-5 shadow-xs">
               <CardContent className="flex items-start justify-between px-5">
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
@@ -108,7 +108,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-slate-200/80 shadow-xs">
+        <Card className="border-border shadow-xs">
           <CardHeader className="flex-row items-center justify-between">
             <div>
               <CardTitle>分类库存分布</CardTitle>
@@ -131,7 +131,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200/80 shadow-xs">
+        <Card className="border-border shadow-xs">
           <CardHeader className="flex-row items-center justify-between">
             <div>
               <CardTitle>最近流水</CardTitle>
@@ -152,8 +152,8 @@ export default async function DashboardPage() {
                   <span
                     className={`grid size-9 shrink-0 place-items-center rounded-xl ${
                       incoming
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-orange-50 text-orange-700"
+                        ? "bg-muted text-foreground"
+                        : "bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
                     }`}
                   >
                     {incoming ? (
@@ -167,7 +167,7 @@ export default async function DashboardPage() {
                     <p className="truncate text-xs text-muted-foreground">{movement.note || "无备注"}</p>
                   </div>
                   <div className="text-right">
-                    <p className={`font-mono text-sm font-semibold ${incoming ? "text-emerald-700" : "text-orange-700"}`}>
+                    <p className={`font-mono text-sm font-semibold ${incoming ? "text-foreground" : "text-orange-700 dark:text-orange-300"}`}>
                       {incoming ? "+" : "−"}{movement.quantity}
                     </p>
                     <p className="text-[11px] text-muted-foreground">{movement.created_at.slice(5, 16)}</p>

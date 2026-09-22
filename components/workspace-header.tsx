@@ -1,10 +1,10 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import { DatabaseIcon } from "lucide-react"
 
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 const pageTitles: Record<string, { title: string; description: string }> = {
   "/dashboard": { title: "库存总览", description: "掌握元件库存的整体状态" },
@@ -14,7 +14,7 @@ const pageTitles: Record<string, { title: string; description: string }> = {
   "/settings": { title: "系统设置", description: "检查登录与数据库连接状态" },
 }
 
-export function WorkspaceHeader({ demoMode }: { demoMode: boolean }) {
+export function WorkspaceHeader() {
   const pathname = usePathname()
   const page = pageTitles[pathname] ?? pageTitles["/dashboard"]
 
@@ -30,12 +30,7 @@ export function WorkspaceHeader({ demoMode }: { demoMode: boolean }) {
           </p>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-xs text-muted-foreground shadow-xs">
-        <DatabaseIcon className="size-3.5" />
-        <span className={demoMode ? "text-amber-700" : "text-emerald-700"}>
-          {demoMode ? "演示数据" : "D1 已连接"}
-        </span>
-      </div>
+      <ThemeToggle />
     </header>
   )
 }
