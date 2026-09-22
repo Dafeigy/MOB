@@ -1,6 +1,7 @@
 # Retos
 
-Retos 是一个面向个人工作台的 PCB 焊接元件库存管理系统，使用 Next.js 16、React 19、shadcn/ui、RareUI OTP Input 和 Cloudflare D1 构建。
+![banner](./public/brand/retos-readme-v2.png)
+Retos 是一个面向个人工作台的 PCB 焊接元件库存管理系统，使用 Next.js 16、React 19、shadcn/ui、RareUI OTP Input 和 Cloudflare D1 构建。目前使用了Tauri2进行煮面段的封装。
 
 ## 已实现
 
