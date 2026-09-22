@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useNavigationTransition } from "@/components/navigation-progress"
 import { ArrowRightIcon, LockKeyholeIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -11,6 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 
 export function LoginForm() {
   const router = useRouter()
+  const startNavigation = useNavigationTransition()
   const [pin, setPin] = useState("")
   const [status, setStatus] = useState<OtpStatus>("idle")
   const [message, setMessage] = useState("")
@@ -43,8 +45,10 @@ export function LoginForm() {
 
       setStatus("success")
       window.setTimeout(() => {
-        router.replace("/dashboard")
-        router.refresh()
+        startNavigation(() => {
+          router.replace("/dashboard")
+          router.refresh()
+        })
       }, 420)
     } catch {
       setStatus("error")

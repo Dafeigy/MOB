@@ -3,6 +3,7 @@ import { CheckCircle2Icon, CloudIcon, KeyRoundIcon, ShieldCheckIcon } from "luci
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { isD1Configured } from "@/lib/d1"
+import { InventoryPageSizeSetting } from "@/components/inventory-page-size-setting"
 
 export const metadata = { title: "系统设置" }
 
@@ -40,6 +41,15 @@ export default function SettingsPage() {
           Retos 从服务器环境变量加载敏感配置，浏览器不会收到密码和 D1 Token。
         </p>
       </section>
+
+      <Card className="border-border shadow-xs">
+        <CardHeader>
+          <CardTitle>库存显示</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <InventoryPageSizeSetting />
+        </CardContent>
+      </Card>
 
       <Card className="border-border shadow-xs">
         <CardHeader>

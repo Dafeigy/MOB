@@ -17,6 +17,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { ComponentItem } from "@/lib/inventory"
 
 export function AddMovementDialog({ items }: { items: ComponentItem[] }) {
@@ -65,34 +72,39 @@ export function AddMovementDialog({ items }: { items: ComponentItem[] }) {
         <form onSubmit={submit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="componentId">元件</Label>
-            <select
-              id="componentId"
+            <Select
               name="componentId"
               required
               defaultValue=""
-              className="h-10 w-full rounded-4xl border border-input bg-input/30 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              <option value="" disabled>请选择元件</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} · {item.value}（现有 {item.quantity}）
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="componentId" className="w-full">
+                <SelectValue placeholder="请选择元件" />
+              </SelectTrigger>
+              <SelectContent>
+                {items.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name} · {item.value}（现有 {item.quantity}）
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="type">操作类型</Label>
-              <select
-                id="type"
+              <Select
                 name="type"
                 defaultValue="in"
-                className="h-10 w-full rounded-4xl border border-input bg-input/30 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                <option value="in">入库</option>
-                <option value="out">出库</option>
-                <option value="adjustment">盘点增加</option>
-              </select>
+                <SelectTrigger id="type" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="in">入库</SelectItem>
+                  <SelectItem value="out">出库</SelectItem>
+                  <SelectItem value="adjustment">盘点增加</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="movementQuantity">数量</Label>

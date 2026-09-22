@@ -1,11 +1,11 @@
 "use client"
 
-import Link from "next/link"
+import Image from "next/image"
+import { ProgressLink as Link, useNavigationTransition } from "@/components/navigation-progress"
 import { usePathname, useRouter } from "next/navigation"
 import {
   AlertTriangleIcon,
   BoxesIcon,
-  CircuitBoardIcon,
   LayoutDashboardIcon,
   LogOutIcon,
   PackagePlusIcon,
@@ -37,11 +37,14 @@ const navigation = [
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const router = useRouter()
+  const startNavigation = useNavigationTransition()
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" })
-    router.replace("/login")
-    router.refresh()
+    startNavigation(() => {
+      router.replace("/login")
+      router.refresh()
+    })
   }
 
   return (
@@ -54,8 +57,15 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
               render={<Link href="/dashboard" />}
               className="cursor-pointer hover:bg-transparent active:bg-transparent"
             >
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground group-data-[collapsible=icon]:size-8">
-                <CircuitBoardIcon className="size-4" />
+              <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-[#111111] group-data-[collapsible=icon]:size-8">
+                <Image
+                  src="/brand/retos-avatar-v2.png"
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="size-full object-contain"
+                  unoptimized
+                />
               </span>
               <span className="grid flex-1 text-left leading-tight">
                 <span className="font-semibold tracking-[-0.02em]">Retos</span>

@@ -1,10 +1,17 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { SearchIcon, Trash2Icon } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { ChevronLeftIcon, ChevronRightIcon, ChevronsUpDownIcon, SearchIcon, Trash2Icon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { EditComponentDialog } from "@/components/edit-component-dialog"
 import { Input } from "@/components/ui/input"
 import { StockMovementDialog } from "@/components/stock-movement-dialog"
@@ -29,9 +36,15 @@ import {
 } from "@/components/ui/table"
 import type { ComponentItem } from "@/lib/inventory"
 
+const PAGE_SIZE_KEY = "retos-inventory-page-size"
+const DEFAULT_PAGE_SIZE = 15
+const PAGE_SIZES = [10, 15, 20] as const
+
 export function InventoryTable({ items }: { items: ComponentItem[] }) {
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "low">("all")
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
+  const [page, setPage] = useState(1)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [message, setMessage] = useState("")
 
@@ -50,6 +63,24 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
       return matchesQuery && matchesFilter
     })
   }, [filter, items, query])
+
+  useEffect(() => {
+    const saved = Number(window.localStorage.getItem(PAGE_SIZE_KEY))
+    if (PAGE_SIZES.some((size) => size === saved)) {
+      const frame = window.requestAnimationFrame(() => setPageSize(saved))
+      return () => window.cancelAnimationFrame(frame)
+    }
+  }, [])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const visibleItems = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  function changePageSize(value: number) {
+    setPageSize(value)
+    setPage(1)
+    window.localStorage.setItem(PAGE_SIZE_KEY, String(value))
+  }
 
   async function remove(item: ComponentItem) {
     setRemovingId(item.id)
@@ -73,7 +104,10 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setPage(1)
+            }}
             placeholder="搜索名称、参数、备注或货位…"
             aria-label="搜索元件"
             className="h-10 rounded-xl border-border bg-background pl-9 shadow-none focus-visible:ring-ring/30"
@@ -87,7 +121,10 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
             <button
               type="button"
               key={value}
-              onClick={() => setFilter(value)}
+              onClick={() => {
+                setFilter(value)
+                setPage(1)
+              }}
               className={`min-h-8 cursor-pointer rounded-full px-3 text-xs font-medium transition-colors ${
                 filter === value
                   ? "bg-background text-foreground shadow-xs"
@@ -113,7 +150,7 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.map((item) => {
+          {visibleItems.map((item) => {
             const low = item.min_quantity !== null && item.quantity <= item.min_quantity
             return (
               <TableRow key={item.id} className="group transition-colors hover:bg-muted/50">
@@ -191,7 +228,7 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
               </TableRow>
             )
           })}
-          {filtered.length === 0 ? (
+          {visibleItems.length === 0 ? (
             <TableRow>
               <TableCell colSpan={7} className="h-36 text-center text-muted-foreground">
                 没有找到匹配的元件
@@ -200,9 +237,46 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
           ) : null}
         </TableBody>
       </Table>
-      <div className="flex min-h-10 items-center border-t px-4 py-3 text-xs text-muted-foreground">
-        <span>显示 {filtered.length} / {items.length} 条元件记录</span>
-        {message ? <span role="alert" className="ml-auto text-destructive">{message}</span> : null}
+      <div className="flex flex-col gap-3 border-t px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <span>显示 {filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filtered.length)} / {filtered.length} 条（共 {items.length} 条）</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span>每页</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" size="sm" aria-label="每页显示数量" className="cursor-pointer gap-2">
+                    {pageSize}
+                    <ChevronsUpDownIcon className="text-muted-foreground" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="min-w-20">
+                <DropdownMenuRadioGroup
+                  value={String(pageSize)}
+                  onValueChange={(value) => changePageSize(Number(value))}
+                >
+                  {PAGE_SIZES.map((size) => (
+                    <DropdownMenuRadioItem key={size} value={String(size)} className="cursor-pointer">
+                      {size}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <span>条</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" aria-label="上一页" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
+              <ChevronLeftIcon />
+            </Button>
+            <span className="min-w-16 text-center">{currentPage} / {pageCount}</span>
+            <Button variant="outline" size="icon" aria-label="下一页" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>
+              <ChevronRightIcon />
+            </Button>
+          </div>
+        </div>
+        {message ? <span role="alert" className="text-destructive sm:ml-auto">{message}</span> : null}
       </div>
     </div>
   )

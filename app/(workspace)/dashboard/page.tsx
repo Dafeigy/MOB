@@ -1,4 +1,4 @@
-import Link from "next/link"
+import { ProgressLink as Link } from "@/components/navigation-progress"
 import {
   AlertTriangleIcon,
   ArrowDownLeftIcon,
