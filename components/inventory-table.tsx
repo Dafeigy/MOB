@@ -172,13 +172,7 @@ export function InventoryTable({ items }: { items: ComponentItem[] }) {
                       {item.quantity}
                     </span>
                     <span className="text-xs text-muted-foreground">pcs</span>
-                    <Badge variant={low ? "destructive" : "outline"} className={low ? "bg-amber-100 text-amber-800" : ""}>
-                      {low ? "需补货" : "充足"}
-                    </Badge>
                   </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {item.min_quantity === null ? "未设置安全线" : `安全线 ${item.min_quantity}`}
-                  </p>
                 </TableCell>
                 <TableCell className="hidden w-28 text-center xl:table-cell">
                   <span className="font-mono text-xs">{item.location || "—"}</span>
