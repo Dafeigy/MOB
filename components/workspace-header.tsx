@@ -10,6 +10,7 @@ const pageTitles: Record<string, { title: string; description: string }> = {
   "/components": { title: "元件库存", description: "查找、录入与维护所有元件" },
   "/movements": { title: "出入库", description: "记录每一次库存变化" },
   "/alerts": { title: "库存提醒", description: "及时处理低于安全线的元件" },
+  "/waitlist": { title: "待开放功能", description: "探索 Retos 正在构建的新能力" },
   "/settings": { title: "系统设置", description: "检查登录与数据库连接状态" },
 }
 

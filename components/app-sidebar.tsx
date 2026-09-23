@@ -8,6 +8,7 @@ import {
   LogOutIcon,
   PackagePlusIcon,
   SettingsIcon,
+  SparklesIcon,
 } from "lucide-react"
 
 import {
@@ -30,6 +31,7 @@ const navigation = [
   { title: "元件库存", href: "/components", icon: BoxesIcon },
   { title: "出入库", href: "/movements", icon: PackagePlusIcon },
   { title: "库存提醒", href: "/alerts", icon: AlertTriangleIcon, badge: "!" },
+  { title: "待开放功能", href: "/waitlist", icon: SparklesIcon, badge: "NEW" },
 ]
 
 export function AppSidebar({ pathname, onLogout, ...props }: React.ComponentProps<typeof Sidebar> & { pathname: string; onLogout?: () => void }) {
