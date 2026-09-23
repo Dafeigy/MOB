@@ -73,6 +73,8 @@ export type ParticleFieldProps = {
    * Use for small fixed-size embeds where the default sparse falloff erases the figure.
    */
   denseParticles?: boolean;
+  /** Upper bound for the number of particles rendered per frame. */
+  maxParticles?: number;
 };
 
 function subscribeDocumentDark(callback: () => void) {
@@ -162,47 +164,77 @@ export function ParticleField({
   adaptToTheme = true,
   typingImpulseRef,
   denseParticles = false,
+  maxParticles = 24000,
 }: ParticleFieldProps) {
   const isDark = useDocumentDark();
-  const fillColorRef = useRef(color);
-  fillColorRef.current = adaptToTheme
-    ? isDark
-      ? "rgba(255, 255, 255, 0.92)"
-      : "rgba(10, 12, 16, 1)"
-    : color;
+  const fillColorRef = useRef(
+    adaptToTheme
+      ? isDark
+        ? "rgba(255, 255, 255, 0.92)"
+        : "rgba(10, 12, 16, 1)"
+      : color,
+  );
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const pointerRef = useRef({ x: -9999, y: -9999, active: false });
   const srcRef = useRef(src);
-  srcRef.current = src;
   const applySrcRef = useRef<((nextSrc: string) => void) | null>(null);
 
   // Tuning props live in refs so the main effect can stay mounted across
   // prop changes (e.g. onboarding step tweaks threshold + dotSize + src
   // simultaneously). Rebuilding the effect would defeat the morph.
   const sampleStepRef = useRef(sampleStep);
-  sampleStepRef.current = sampleStep;
   const thresholdRef = useRef(threshold);
-  thresholdRef.current = threshold;
   const renderScaleRef = useRef(renderScale);
-  renderScaleRef.current = renderScale;
   const dotSizeRef = useRef(dotSize);
-  dotSizeRef.current = dotSize;
   const mouseForceRef = useRef(mouseForce);
-  mouseForceRef.current = mouseForce;
   const mouseRadiusRef = useRef(mouseRadius);
-  mouseRadiusRef.current = mouseRadius;
   const springRef = useRef(spring);
-  springRef.current = spring;
   const dampingRef = useRef(damping);
-  dampingRef.current = damping;
   const alignRef = useRef(align);
-  alignRef.current = align;
   const invertRef = useRef(invert);
-  invertRef.current = invert;
   const denseParticlesRef = useRef(denseParticles);
-  denseParticlesRef.current = denseParticles;
+  const maxParticlesRef = useRef(maxParticles);
+  const resampleRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    fillColorRef.current = adaptToTheme
+      ? isDark
+        ? "rgba(255, 255, 255, 0.92)"
+        : "rgba(10, 12, 16, 1)"
+      : color;
+    srcRef.current = src;
+    sampleStepRef.current = sampleStep;
+    thresholdRef.current = threshold;
+    renderScaleRef.current = renderScale;
+    dotSizeRef.current = dotSize;
+    mouseForceRef.current = mouseForce;
+    mouseRadiusRef.current = mouseRadius;
+    springRef.current = spring;
+    dampingRef.current = damping;
+    alignRef.current = align;
+    invertRef.current = invert;
+    denseParticlesRef.current = denseParticles;
+    maxParticlesRef.current = Math.max(1, Math.floor(maxParticles));
+  }, [
+    adaptToTheme,
+    align,
+    color,
+    damping,
+    denseParticles,
+    dotSize,
+    invert,
+    isDark,
+    maxParticles,
+    mouseForce,
+    mouseRadius,
+    renderScale,
+    sampleStep,
+    spring,
+    src,
+    threshold,
+  ]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -227,6 +259,8 @@ export function ParticleField({
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     let currentImage: HTMLImageElement | null = null;
     let loadToken = 0;
+    let reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let pageVisible = document.visibilityState !== "hidden";
 
     const ensureCanvasSize = () => {
       const rect = wrapper.getBoundingClientRect();
@@ -286,7 +320,7 @@ export function ParticleField({
       const denseV = denseParticlesRef.current;
       const dotSizeV = dotSizeRef.current;
 
-      const targets: ParticleTarget[] = [];
+      let targets: ParticleTarget[] = [];
       for (let y = 0; y < sampleH; y++) {
         for (let x = 0; x < sampleW; x++) {
           const idx = (y * sampleW + x) * 4;
@@ -322,6 +356,16 @@ export function ParticleField({
             alpha: 0.35 + lum * 0.6,
           });
         }
+      }
+      if (targets.length > maxParticlesRef.current) {
+        // Reservoir sampling keeps the cap representative without introducing
+        // a visible raster-stripe pattern when the source is very dense.
+        const reservoir = targets.slice(0, maxParticlesRef.current);
+        for (let i = maxParticlesRef.current; i < targets.length; i++) {
+          const slot = Math.floor(Math.random() * (i + 1));
+          if (slot < reservoir.length) reservoir[slot] = targets[i];
+        }
+        targets = reservoir;
       }
       return targets;
     };
@@ -444,7 +488,7 @@ export function ParticleField({
       const mr = mouseRadiusV * dpr;
       const mr2 = mr * mr;
 
-      let typing = typingImpulseRef?.current ?? 0;
+      const typing = typingImpulseRef?.current ?? 0;
       if (typingImpulseRef && typing > 1e-4) {
         typingImpulseRef.current *= 0.93;
       }
@@ -516,7 +560,11 @@ export function ParticleField({
       }
       if (writeIdx !== particles.length) particles.length = writeIdx;
       ctx.globalAlpha = 1;
-      rafId = requestAnimationFrame(render);
+      if (!reducedMotion && pageVisible) {
+        rafId = requestAnimationFrame(render);
+      } else {
+        rafId = 0;
+      }
     };
 
     const onPointerMove = (e: PointerEvent) => {
@@ -537,7 +585,10 @@ export function ParticleField({
         if (resizeTimer) clearTimeout(resizeTimer);
         // Drag-resizing can fire continuously; debounce expensive resampling.
         resizeTimer = setTimeout(() => {
-          if (currentImage) buildFresh(currentImage);
+          if (currentImage) {
+            buildFresh(currentImage);
+            if (reducedMotion) render();
+          }
         }, 120);
       });
     });
@@ -552,23 +603,56 @@ export function ParticleField({
         currentImage = image;
         if (asMorph) morphTo(image);
         else buildFresh(image);
+        if (reducedMotion) render();
+      };
+      image.onerror = () => {
+        if (!destroyed && token === loadToken) {
+          console.error(`[ParticleField] Failed to load source image: ${nextSrc}`);
+        }
       };
       image.src = nextSrc;
     };
 
     applySrcRef.current = (nextSrc: string) => loadAndApply(nextSrc, true);
+    resampleRef.current = () => {
+      if (currentImage) {
+        morphTo(currentImage);
+        if (reducedMotion) render();
+      }
+    };
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleMotionChange = (event: MediaQueryListEvent) => {
+      reducedMotion = event.matches;
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+      if (reducedMotion) render();
+      else if (pageVisible) rafId = requestAnimationFrame(render);
+    };
+    const handleVisibilityChange = () => {
+      pageVisible = document.visibilityState !== "hidden";
+      if (!pageVisible) {
+        cancelAnimationFrame(rafId);
+        rafId = 0;
+      } else if (!reducedMotion) {
+        rafId = requestAnimationFrame(render);
+      }
+    };
 
     // Start render loop + resize observer up-front — drawing an empty
     // particle array is a no-op, and starting eagerly avoids races where a
     // second load (e.g. parallel src-change effect) supersedes the initial
     // load's onload before it had a chance to kick off the RAF.
     ro.observe(wrapper);
-    rafId = requestAnimationFrame(render);
+    if (reducedMotion) render();
+    else rafId = requestAnimationFrame(render);
 
     loadAndApply(srcRef.current, false);
 
     wrapper.addEventListener("pointermove", onPointerMove);
     wrapper.addEventListener("pointerleave", onPointerLeave);
+    mediaQuery.addEventListener("change", handleMotionChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       destroyed = true;
@@ -578,7 +662,10 @@ export function ParticleField({
       ro.disconnect();
       wrapper.removeEventListener("pointermove", onPointerMove);
       wrapper.removeEventListener("pointerleave", onPointerLeave);
+      mediaQuery.removeEventListener("change", handleMotionChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       applySrcRef.current = null;
+      resampleRef.current = null;
     };
     // Tuning props (threshold, dotSize, align, etc.) are read from refs,
     // so we intentionally don't include them here — re-running this effect
@@ -596,10 +683,26 @@ export function ParticleField({
     applySrcRef.current?.(src);
   }, [src]);
 
+  // Sampling-related props need a new target set. Animation-only props remain
+  // live through refs and do not require rebuilding the particle system.
+  useEffect(() => {
+    resampleRef.current?.();
+  }, [
+    sampleStep,
+    threshold,
+    renderScale,
+    dotSize,
+    align,
+    invert,
+    denseParticles,
+    maxParticles,
+  ]);
+
   return (
     <div
       ref={wrapperRef}
       className={className}
+      aria-hidden="true"
       style={{ position: "relative", width: "100%", height: "100%" }}
     >
       <canvas

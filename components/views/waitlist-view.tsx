@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { ArrowLeftIcon, CircleDashedIcon, SparklesIcon } from "lucide-react"
+import { ArrowLeftIcon, SparklesIcon } from "lucide-react"
 
 import { NavigationLink as Link } from "@/components/navigation-link"
 import {
