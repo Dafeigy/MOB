@@ -12,6 +12,7 @@ import { ComponentsView } from "@/components/views/components-view"
 import { DashboardView } from "@/components/views/dashboard-view"
 import { MovementsView } from "@/components/views/movements-view"
 import { AlertsView } from "@/components/views/alerts-view"
+import { WaitlistView } from "@/components/views/waitlist-view"
 import { inventoryOverview } from "@/lib/inventory-types"
 import { createMovement, saveComponent, type Snapshot, type SyncReport } from "./api"
 import { DesktopSettings } from "./settings"
@@ -80,7 +81,19 @@ export function DesktopApp() {
       <AppSidebar pathname={pathname} />
       <SidebarInset className="min-w-0 bg-muted/30"><WorkspaceHeader pathname={pathname} /><main className="flex-1 p-4 sm:p-6 lg:p-8">
         {error ? <div role="alert" className="mb-4 flex items-center gap-3 text-sm text-destructive">{error}<Button variant="outline" size="sm" onClick={() => void refresh().catch((e) => setError(actionError(e)))}>重试</Button></div> : null}
-        {pathname === "/settings" ? <DesktopSettings onSaved={refresh} /> : !snapshot ? <div role="status" aria-label="加载库存" className="grid min-h-64 place-items-center"><LoaderCircleIcon className="size-5 animate-spin" /></div> : pathname === "/dashboard" ? <DashboardView overview={inventoryOverview(snapshot.components, snapshot.movements)} /> : pathname === "/movements" ? <MovementsView items={snapshot.components} movements={snapshot.movements} /> : pathname === "/alerts" ? <AlertsView items={snapshot.components} /> : <>
+        {pathname === "/settings" 
+          ? <DesktopSettings onSaved={refresh} /> 
+          : !snapshot 
+            ? <div role="status" aria-label="加载库存" className="grid min-h-64 place-items-center"><LoaderCircleIcon className="size-5 animate-spin" /></div> 
+            : pathname === "/dashboard" 
+              ? <DashboardView overview={inventoryOverview(snapshot.components, snapshot.movements)} /> 
+              : pathname === "/movements" 
+                ? <MovementsView items={snapshot.components} movements={snapshot.movements} /> 
+                : pathname === "/waitlist" 
+                ? <WaitlistView />
+                  : pathname === "/alerts" 
+                  ? <AlertsView items={snapshot.components} /> 
+                    : <>
           <ComponentsView items={snapshot.components} actions={syncButtons} />
           {syncMessage ? <p role={syncFailed ? "alert" : "status"} className={`mx-auto mt-3 max-w-[1440px] text-sm ${syncFailed ? "text-destructive" : "text-muted-foreground"}`}>{syncMessage}</p> : null}
         </>}
