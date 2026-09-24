@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { useInventoryActions } from "@/components/inventory-actions"
 import { cn } from "@/lib/utils"
 import type { ComponentItem, StorageBox } from "@/lib/inventory-types"
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel"
 
 type BoxDefinition = StorageBox
 type ParsedLocation = { boxId: string; x: number; y: number }
@@ -36,16 +37,115 @@ function parseLocation(location: string): ParsedLocation | null {
 function getThemeColors() {
   const dark = document.documentElement.classList.contains("dark")
   return dark
-    ? { background: 0x1c2025, top: 0x424a54, side: 0x303740, border: 0x7a838d, slot: 0x3c444e, occupied: 0x86b83d, accent: 0x858d96, edge: 0x9aa2aa, floor: 0x11151a }
-    : { background: 0xfafafa, top: 0xe1e5e8, side: 0xc5cbd1, border: 0x68727d, slot: 0xf3f4f5, occupied: 0xb7e36a, accent: 0x858d96, edge: 0x5f6974, floor: 0xdfe3e6 }
+    ? {
+        top: 0x59636d,
+        side: 0x3d454e,
+        border: 0x626c76,
+        slot: 0x343c45,
+        occupied: 0xa3e635,
+        occupiedOpacity: 0.46,
+        accent: 0x66717c,
+        edge: 0xa3adb7,
+        surfaceOpacity: 1,
+        sideOpacity: 1,
+        rimOpacity: 1,
+        slotOpacity: 1,
+        edgeOpacity: 0.9,
+      }
+    : {
+        top: 0xd8dde1,
+        side: 0xb9c2ca,
+        border: 0x929da7,
+        slot: 0xe5e9ec,
+        occupied: 0xf59e0b,
+        occupiedOpacity: 0.46,
+        accent: 0xc4ccd3,
+        edge: 0x5e6974,
+        surfaceOpacity: 1,
+        sideOpacity: 1,
+        rimOpacity: 1,
+        slotOpacity: 1,
+        edgeOpacity: 0.88,
+      }
 }
 
-function setMaterialColor(mesh: THREE.Mesh, color: number) {
-  const material = mesh.material as THREE.MeshBasicMaterial
-  material.color.setHex(color)
+function setSlotAppearance(mesh: THREE.Mesh, selected: boolean, colors: ReturnType<typeof getThemeColors>) {
+  const materials = mesh.material as THREE.MeshBasicMaterial[]
+  const occupied = Boolean(mesh.userData.occupied)
+  materials.forEach((material, index) => {
+    material.color.setHex(occupied
+      ? colors.occupied
+      : selected ? colors.accent : index === 2 ? colors.slot : colors.side)
+    material.transparent = occupied
+    material.opacity = occupied ? colors.occupiedOpacity : 1
+    material.depthWrite = !occupied
+  })
 }
 
-function ThreeStorageScene({ box, locations, selectedCell, onSelect, onHover }: { box: BoxDefinition; locations: Map<string, ComponentItem[]>; selectedCell: Cell | null; onSelect: (cell: Cell | null) => void; onHover: (cell: Cell | null) => void }) {
+function setMaterialOpacity(object: THREE.Mesh | THREE.LineSegments, opacity: number) {
+  const materials = Array.isArray(object.material) ? object.material : [object.material]
+  materials.forEach((material) => {
+    material.transparent = opacity < 1
+    material.opacity = opacity
+    material.depthWrite = opacity >= 1
+    material.needsUpdate = true
+  })
+}
+
+function StorageBoxThumbnail({ active }: { active: boolean }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 44 28" className="h-7 w-11 overflow-visible fill-none">
+      <path d="M9 6.5h27l-2.5 10H6.5L9 6.5Z" className={cn("fill-muted/45 stroke-muted-foreground/55", active && "fill-foreground/8 stroke-foreground")} />
+      <path d="M6.5 16.5h27l-1.5 5H5l1.5-5Z" className={cn("fill-muted/70 stroke-muted-foreground/55", active && "fill-foreground/12 stroke-foreground")} />
+      <path d="M12 10h20M10.5 13.5h20" className={cn("stroke-muted-foreground/35", active && "stroke-foreground/55")} />
+    </svg>
+  )
+}
+
+function paintLabelTexture(canvas: HTMLCanvasElement, label: string, subtitle: string, dark: boolean) {
+  const context = canvas.getContext("2d")
+  if (!context) return
+  const fontFamily = '"Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
+  const fitFont = (text: string, maxWidth: number, initialSize: number, weight: number) => {
+    let size = initialSize
+    context.font = `${weight} ${size}px ${fontFamily}`
+    while (context.measureText(text).width > maxWidth && size > 30) {
+      size -= 2
+      context.font = `${weight} ${size}px ${fontFamily}`
+    }
+    return size
+  }
+
+  context.clearRect(0, 0, canvas.width, canvas.height)
+  context.textAlign = "left"
+  context.textBaseline = "middle"
+  context.lineCap = "round"
+  context.strokeStyle = dark ? "#a3e635" : "#ea580c"
+  context.lineWidth = 12
+  context.beginPath()
+  context.moveTo(56, 58)
+  context.lineTo(56, 260)
+  context.stroke()
+
+  const labelSize = fitFont(label, 860, 132, 700)
+  context.font = `700 ${labelSize}px ${fontFamily}`
+  context.fillStyle = dark ? "#ecfccb" : "#9a3412"
+  context.fillText(label, 92, 120)
+
+  const subtitleSize = fitFont(subtitle, 860, 60, 500)
+  context.font = `500 ${subtitleSize}px ${fontFamily}`
+  context.fillStyle = dark ? "#cbd5e1" : "#475569"
+  context.fillText(subtitle, 92, 205)
+
+  context.strokeStyle = dark ? "rgba(226,232,240,.28)" : "rgba(71,85,105,.28)"
+  context.lineWidth = 3
+  context.beginPath()
+  context.moveTo(92, 264)
+  context.lineTo(950, 264)
+  context.stroke()
+}
+
+function ThreeStorageScene({ label, subtitle, locations, selectedCell, onSelect, onHover }: { label: string; subtitle: string; locations: Map<string, ComponentItem[]>; selectedCell: Cell | null; onSelect: (cell: Cell | null) => void; onHover: (cell: Cell | null) => void }) {
   const mountRef = useRef<HTMLDivElement>(null)
   const selectedRef = useRef(selectedCell)
   const onSelectRef = useRef(onSelect)
@@ -62,24 +162,37 @@ function ThreeStorageScene({ box, locations, selectedCell, onSelect, onHover }: 
     if (!container) return
     let colors = getThemeColors()
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(colors.background)
     // An orthographic camera keeps parallel edges parallel, which is the key
     // visual characteristic of an isometric storage layout.
     const camera = new THREE.OrthographicCamera(-6, 6, 6, -6, 0.1, 100)
     camera.position.set(10, 10, 10)
     camera.zoom = 1.05
     camera.lookAt(0, 0, 0)
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.setClearColor(colors.background, 1)
+    renderer.setClearColor(0x000000, 0)
     container.appendChild(renderer.domElement)
     renderer.domElement.className = "size-full cursor-grab active:cursor-grabbing"
 
     const group = new THREE.Group()
     group.rotation.x = 0
     group.rotation.y = -0.08
-    group.position.y = 2.2
     scene.add(group)
+
+    const labelCanvas = document.createElement("canvas")
+    labelCanvas.width = 1024
+    labelCanvas.height = 320
+    paintLabelTexture(labelCanvas, label, subtitle, document.documentElement.classList.contains("dark"))
+    const labelTexture = new THREE.CanvasTexture(labelCanvas)
+    labelTexture.colorSpace = THREE.SRGBColorSpace
+    labelTexture.anisotropy = renderer.capabilities.getMaxAnisotropy()
+    const labelMaterial = new THREE.MeshBasicMaterial({ map: labelTexture, transparent: true, depthWrite: false, side: THREE.DoubleSide })
+    const projectedLabel = new THREE.Mesh(new THREE.PlaneGeometry(6.6, 2.08), labelMaterial)
+    projectedLabel.userData.themeRole = "projectedLabel"
+    projectedLabel.position.set(-2, -0.55, 5.7)
+    projectedLabel.rotation.x = -Math.PI / 2
+    projectedLabel.renderOrder = 4
+    group.add(projectedLabel)
 
     const baseGeometry = new THREE.BoxGeometry(9.3, 0.5, 8.3)
     const base = new THREE.Mesh(baseGeometry, [
@@ -94,44 +207,68 @@ function ThreeStorageScene({ box, locations, selectedCell, onSelect, onHover }: 
     base.position.y = -0.28
     group.add(base)
 
-    const top = new THREE.Mesh(new THREE.BoxGeometry(9.0, 0.14, 8.0), new THREE.MeshBasicMaterial({ color: colors.top }))
+    const topGeometry = new THREE.BoxGeometry(9.0, 0.14, 8.0)
+    const top = new THREE.Mesh(topGeometry, new THREE.MeshBasicMaterial({ color: colors.top }))
     top.userData.themeRole = "top"
     top.position.y = 0.03
     group.add(top)
 
-    const rimMaterial = new THREE.MeshBasicMaterial({ color: colors.border })
     const rims = [[0, 0.23, -4.02, 9.2, 0.4, 0.18], [0, 0.23, 4.02, 9.2, 0.4, 0.18], [-4.52, 0.23, 0, 0.18, 0.4, 8.1], [4.52, 0.23, 0, 0.18, 0.4, 8.1]] as const
     for (const [x, y, z, sx, sy, sz] of rims) {
-      const rim = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), rimMaterial)
+      const rimGeometry = new THREE.BoxGeometry(sx, sy, sz)
+      const rim = new THREE.Mesh(rimGeometry, new THREE.MeshBasicMaterial({ color: colors.border }))
       rim.userData.themeRole = "rim"
       rim.position.set(x, y, z)
       group.add(rim)
+
+      const rimEdges = new THREE.LineSegments(new THREE.EdgesGeometry(rimGeometry), new THREE.LineBasicMaterial({ color: colors.edge, transparent: true, opacity: colors.edgeOpacity }))
+      rimEdges.userData.themeRole = "structureEdge"
+      rimEdges.position.copy(rim.position)
+      group.add(rimEdges)
     }
 
-    const edgeMaterial = new THREE.LineBasicMaterial({ color: colors.edge, transparent: true, opacity: 0.7 })
-    const baseEdges = new THREE.LineSegments(new THREE.EdgesGeometry(baseGeometry), edgeMaterial)
-    baseEdges.userData.themeRole = "edge"
+    const baseEdges = new THREE.LineSegments(new THREE.EdgesGeometry(baseGeometry), new THREE.LineBasicMaterial({ color: colors.edge, transparent: true, opacity: colors.edgeOpacity }))
+    baseEdges.userData.themeRole = "structureEdge"
     baseEdges.position.copy(base.position)
     group.add(baseEdges)
 
+    const topEdges = new THREE.LineSegments(new THREE.EdgesGeometry(topGeometry), new THREE.LineBasicMaterial({ color: colors.edge, transparent: true, opacity: colors.edgeOpacity * 0.72 }))
+    topEdges.userData.themeRole = "topEdge"
+    topEdges.position.copy(top.position)
+    group.add(topEdges)
+
     const slotMeshes = new Map<string, THREE.Mesh>()
+    const slotGroups = new Map<string, THREE.Group>()
     for (let index = 0; index < 56; index += 1) {
       const x = (index % 8) + 1
       const y = Math.floor(index / 8) + 1
       const key = `${x}-${y}`
       const cellItems = locations.get(key) ?? []
+      const occupied = cellItems.length > 0
       const slotGeometry = new THREE.BoxGeometry(0.94, 0.18, 0.86)
-      const slot = new THREE.Mesh(slotGeometry, new THREE.MeshBasicMaterial({ color: cellItems.length ? colors.occupied : colors.slot }))
-      slot.position.set((x - 4.5) * 1.08, 0.24, (y - 4) * 1.03)
+      const slot = new THREE.Mesh(slotGeometry, Array.from({ length: 6 }, (_, faceIndex) => new THREE.MeshBasicMaterial({
+        color: occupied ? colors.occupied : faceIndex === 2 ? colors.slot : colors.side,
+        transparent: occupied,
+        opacity: occupied ? colors.occupiedOpacity : 1,
+        depthWrite: !occupied,
+      })))
       slot.userData.themeRole = "slot"
-      slot.userData.occupied = cellItems.length > 0
-      const slotEdges = new THREE.LineSegments(new THREE.EdgesGeometry(slotGeometry), edgeMaterial)
-      slotEdges.userData.themeRole = "edge"
-      slotEdges.position.copy(slot.position)
-      group.add(slotEdges)
+      slot.userData.occupied = occupied
       slot.userData.cell = { x, y }
-      group.add(slot)
+      const slotEdges = new THREE.LineSegments(new THREE.EdgesGeometry(slotGeometry), new THREE.LineBasicMaterial({
+        color: colors.edge,
+        transparent: true,
+        opacity: colors.edgeOpacity * 0.82,
+      }))
+      slotEdges.userData.themeRole = "slotEdge"
+      slotEdges.userData.occupied = occupied
+      slotEdges.renderOrder = 1
+      const slotGroup = new THREE.Group()
+      slotGroup.position.set((x - 4.5) * 1.08, 0.24, (y - 4) * 1.03)
+      slotGroup.add(slotEdges, slot)
+      group.add(slotGroup)
       slotMeshes.set(key, slot)
+      slotGroups.set(key, slotGroup)
     }
 
     let frame = 0
@@ -141,8 +278,6 @@ function ThreeStorageScene({ box, locations, selectedCell, onSelect, onHover }: 
     let lastX = 0
     let lastY = 0
     let hoveredKey: string | null = null
-    const startTime = performance.now()
-    const transitionDuration = 900
 
     function resize() {
       const width = mountRef.current?.clientWidth ?? 0
@@ -155,17 +290,23 @@ function ThreeStorageScene({ box, locations, selectedCell, onSelect, onHover }: 
       camera.bottom = -frustumHeight / 2
       camera.updateProjectionMatrix()
       renderer.setSize(width, height, false)
+      const compact = width < 640
+      targetZoom = compact ? 0.68 : 1.05
+      camera.zoom = targetZoom
+      camera.updateProjectionMatrix()
+      projectedLabel.position.set(compact ? 0.15 : -2, -0.55, compact ? 5 : 5.7)
+      projectedLabel.scale.setScalar(compact ? 0.9 : 1)
     }
     function setHover(key: string | null) {
       if (hoveredKey === key) return
       if (hoveredKey) {
         const old = slotMeshes.get(hoveredKey)
-        if (old) setMaterialColor(old, locations.has(hoveredKey) ? colors.occupied : colors.slot)
+        if (old) setSlotAppearance(old, hoveredKey === `${selectedRef.current?.x}-${selectedRef.current?.y}`, colors)
       }
       hoveredKey = key
       if (hoveredKey) {
         const next = slotMeshes.get(hoveredKey)
-        if (next && hoveredKey !== `${selectedRef.current?.x}-${selectedRef.current?.y}`) setMaterialColor(next, colors.accent)
+        if (next) setSlotAppearance(next, hoveredKey === `${selectedRef.current?.x}-${selectedRef.current?.y}`, colors)
       }
     }
     function pointerCell(event: PointerEvent | MouseEvent) {
@@ -197,6 +338,11 @@ function ThreeStorageScene({ box, locations, selectedCell, onSelect, onHover }: 
       lastX = event.clientX
       lastY = event.clientY
     }
+    function handlePointerLeave() {
+      if (dragging) return
+      setHover(null)
+      onHoverRef.current(null)
+    }
     function handlePointerUp(event: PointerEvent) {
       dragging = false
       renderer.domElement.releasePointerCapture(event.pointerId)
@@ -213,6 +359,7 @@ function ThreeStorageScene({ box, locations, selectedCell, onSelect, onHover }: 
 
     renderer.domElement.addEventListener("pointerdown", handlePointerDown)
     renderer.domElement.addEventListener("pointermove", handlePointerMove)
+    renderer.domElement.addEventListener("pointerleave", handlePointerLeave)
     renderer.domElement.addEventListener("pointerup", handlePointerUp)
     renderer.domElement.addEventListener("click", handleClick)
     renderer.domElement.addEventListener("wheel", handleWheel, { passive: false })
@@ -221,35 +368,57 @@ function ThreeStorageScene({ box, locations, selectedCell, onSelect, onHover }: 
     resize()
 
     function animate(now: number) {
-      const elapsed = Math.min((now - startTime) / transitionDuration, 1)
-      const eased = elapsed * elapsed * (3 - 2 * elapsed)
-      if (elapsed < 1) {
-        group.position.y = THREE.MathUtils.lerp(2.2, 0, eased)
-      }
       camera.zoom = THREE.MathUtils.lerp(camera.zoom, targetZoom, 0.12)
       camera.updateProjectionMatrix()
       const selectedKey = selectedRef.current ? `${selectedRef.current.x}-${selectedRef.current.y}` : null
       for (const [key, mesh] of slotMeshes) {
-        if (key === selectedKey) setMaterialColor(mesh, colors.accent)
-        else if (key !== hoveredKey) setMaterialColor(mesh, locations.has(key) ? colors.occupied : colors.slot)
+        setSlotAppearance(mesh, key === selectedKey, colors)
+        const slotGroup = slotGroups.get(key)
+        if (slotGroup) {
+          const targetY = 0.24 + (key === hoveredKey ? 0.2 : 0)
+          const smoothing = 1 - Math.exp(-Math.min(now - (slotGroup.userData.lastFrame ?? now), 48) * 0.018)
+          slotGroup.position.y = THREE.MathUtils.lerp(slotGroup.position.y, targetY, smoothing)
+          slotGroup.userData.lastFrame = now
+        }
       }
       renderer.render(scene, camera)
       frame = requestAnimationFrame(animate)
     }
     const themeObserver = new MutationObserver(() => {
       colors = getThemeColors()
-      scene.background = new THREE.Color(colors.background)
-      renderer.setClearColor(colors.background, 1)
       scene.traverse((object) => {
         const role = object.userData.themeRole as string | undefined
         if (!(object instanceof THREE.Mesh || object instanceof THREE.LineSegments) || !role) return
         const materials = Array.isArray(object.material) ? object.material : [object.material]
         if (role === "base") {
-          materials.forEach((material, index) => (material as THREE.MeshBasicMaterial).color.setHex(index === 2 ? colors.top : colors.side))
-        } else if (role === "top") materials[0].color.setHex(colors.top)
-        else if (role === "rim") materials[0].color.setHex(colors.border)
-        else if (role === "edge") materials[0].color.setHex(colors.edge)
-        else if (role === "slot") materials[0].color.setHex(object.userData.occupied ? colors.occupied : colors.slot)
+          materials.forEach((material, index) => {
+            ;(material as THREE.MeshBasicMaterial).color.setHex(index === 2 ? colors.top : colors.side)
+            material.opacity = index === 2 ? colors.surfaceOpacity : colors.sideOpacity
+          })
+        } else if (role === "top") {
+          materials[0].color.setHex(colors.top)
+          setMaterialOpacity(object, colors.surfaceOpacity)
+        } else if (role === "rim") {
+          materials[0].color.setHex(colors.border)
+          setMaterialOpacity(object, colors.rimOpacity)
+        } else if (role === "structureEdge") {
+          materials[0].color.setHex(colors.edge)
+          setMaterialOpacity(object, colors.edgeOpacity)
+        } else if (role === "topEdge") {
+          materials[0].color.setHex(colors.edge)
+          setMaterialOpacity(object, colors.edgeOpacity * 0.72)
+        } else if (role === "slotEdge") {
+          materials[0].color.setHex(colors.edge)
+          setMaterialOpacity(object, colors.edgeOpacity * 0.82)
+        } else if (role === "slot") {
+          const slotMesh = object as THREE.Mesh
+          const cell = slotMesh.userData.cell as Cell | undefined
+          const selected = cell && `${cell.x}-${cell.y}` === `${selectedRef.current?.x}-${selectedRef.current?.y}`
+          setSlotAppearance(slotMesh, Boolean(selected), colors)
+        } else if (role === "projectedLabel") {
+          paintLabelTexture(labelCanvas, label, subtitle, document.documentElement.classList.contains("dark"))
+          labelTexture.needsUpdate = true
+        }
       })
     })
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
@@ -261,6 +430,7 @@ function ThreeStorageScene({ box, locations, selectedCell, onSelect, onHover }: 
       observer.disconnect()
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown)
       renderer.domElement.removeEventListener("pointermove", handlePointerMove)
+      renderer.domElement.removeEventListener("pointerleave", handlePointerLeave)
       renderer.domElement.removeEventListener("pointerup", handlePointerUp)
       renderer.domElement.removeEventListener("click", handleClick)
       renderer.domElement.removeEventListener("wheel", handleWheel)
@@ -270,38 +440,51 @@ function ThreeStorageScene({ box, locations, selectedCell, onSelect, onHover }: 
         if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments) {
           object.geometry.dispose()
           const material = object.material
-          if (Array.isArray(material)) material.forEach((item) => item.dispose())
-          else material.dispose()
+          if (Array.isArray(material)) material.forEach((item) => {
+            item.map?.dispose()
+            item.dispose()
+          })
+          else {
+            material.map?.dispose()
+            material.dispose()
+          }
         }
       })
     }
-  }, [box, locations])
+  }, [label, locations, subtitle])
 
-  return <div ref={mountRef} className="h-[360px] w-full touch-none sm:h-[430px]" aria-label={`${box.label} 三维收纳盒`} role="img" />
+  return <div ref={mountRef} className="h-[360px] w-full touch-none sm:h-[430px]" aria-label={`${label} 三维收纳盒`} role="img" />
 }
 
 export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { items: ComponentItem[]; boxes?: StorageBox[] }) {
   const actions = useInventoryActions()
   const boxes = incomingBoxes && incomingBoxes.length > 0 ? incomingBoxes : DEFAULT_BOXES
   const [activeBox, setActiveBox] = useState(0)
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>()
+  const [renderedBoxes, setRenderedBoxes] = useState<number[]>([0])
   const [selectedCell, setSelectedCell] = useState<Cell | null>(null)
   const [hoveredCell, setHoveredCell] = useState<Cell | null>(null)
   const [entryOpen, setEntryOpen] = useState(false)
   const [entryLocation, setEntryLocation] = useState("")
   const [dialog, setDialog] = useState<"add" | "rename" | null>(null)
   const [draftName, setDraftName] = useState("")
+  const [draftSubtitle, setDraftSubtitle] = useState("")
 
   const box = boxes[activeBox] ?? boxes[0]
-  const locations = useMemo(() => {
-    const map = new Map<string, ComponentItem[]>()
+  const locationsByBox = useMemo(() => {
+    const boxMaps = new Map<string, Map<string, ComponentItem[]>>()
+    for (const candidate of boxes) boxMaps.set(candidate.id, new Map())
     for (const item of items) {
       const parsed = parseLocation(item.location)
-      if (!parsed || parsed.boxId !== box.id) continue
+      if (!parsed) continue
+      const map = boxMaps.get(parsed.boxId)
+      if (!map) continue
       const key = `${parsed.x}-${parsed.y}`
       map.set(key, [...(map.get(key) ?? []), item])
     }
-    return map
-  }, [box.id, items])
+    return boxMaps
+  }, [boxes, items])
+  const locations = locationsByBox.get(box.id) ?? new Map<string, ComponentItem[]>()
   const selectedItems = selectedCell ? locations.get(`${selectedCell.x}-${selectedCell.y}`) ?? [] : []
   const hoveredItems = hoveredCell ? locations.get(`${hoveredCell.x}-${hoveredCell.y}`) ?? [] : []
   const categories = Array.from(new Set(items.map((item) => item.category)))
@@ -311,16 +494,34 @@ export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { ite
     return !parsed || !boxes.some((candidate) => candidate.id === parsed.boxId)
   }).length
 
-  function changeBox(next: number) {
-    setActiveBox((next + boxes.length) % boxes.length)
-    setSelectedCell(null)
-  }
+  useEffect(() => {
+    if (!carouselApi) return
+    const syncActiveBox = () => {
+      const selected = carouselApi.selectedScrollSnap()
+      setActiveBox(selected)
+      setRenderedBoxes((current) => current.includes(selected) ? current : [...current, selected])
+      setSelectedCell(null)
+      setHoveredCell(null)
+    }
+    const releasePreviousSlides = () => setRenderedBoxes([carouselApi.selectedScrollSnap()])
+    syncActiveBox()
+    carouselApi.on("select", syncActiveBox)
+    carouselApi.on("reInit", syncActiveBox)
+    carouselApi.on("settle", releasePreviousSlides)
+    return () => {
+      carouselApi.off("select", syncActiveBox)
+      carouselApi.off("reInit", syncActiveBox)
+      carouselApi.off("settle", releasePreviousSlides)
+    }
+  }, [carouselApi])
   function openAdd() {
     setDraftName(`盒 ${String(boxes.length + 1).padStart(2, "0")}`)
+    setDraftSubtitle("新建收纳盒")
     setDialog("add")
   }
   function openRename() {
     setDraftName(box.label)
+    setDraftSubtitle(box.subtitle)
     setDialog("rename")
   }
   function locationFor(cell: Cell) {
@@ -334,11 +535,12 @@ export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { ite
   }
   async function submitDialog() {
     const label = draftName.trim()
+    const subtitle = draftSubtitle.trim()
     if (!label) return
-    if (dialog === "rename") await actions.updateStorageBox(box.id, label, box.subtitle)
+    if (dialog === "rename") await actions.updateStorageBox(box.id, label, subtitle)
     if (dialog === "add") {
       const id = Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 + index)).find((candidate) => !boxes.some((boxItem) => boxItem.id === candidate)) ?? `BOX-${boxes.length + 1}`
-      await actions.createStorageBox(id, label, "新建收纳盒")
+      await actions.createStorageBox(id, label, subtitle)
       setActiveBox(boxes.length)
     }
     setDialog(null)
@@ -353,18 +555,148 @@ export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { ite
   }
 
   return (
-    <section aria-labelledby="location-map-title" className="overflow-hidden border-y border-border/70 bg-background/45">
-      <div className="flex flex-col gap-4 px-1 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-2">
-        <div><div className="flex items-center gap-2"><MapPinIcon className="size-4 text-muted-foreground" /><h3 id="location-map-title" className="text-sm font-semibold">收纳盒总览</h3><Badge variant="outline" className="font-mono text-[10px] font-normal">7 × 8 · 3D</Badge></div><p className="mt-1 pl-6 text-xs text-muted-foreground">拖动旋转，滚轮缩放，点击货位查看元件。</p></div>
-        <div className="flex flex-wrap items-center justify-end gap-1 self-end sm:self-start" aria-label="切换收纳盒">
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="上一个盒子" onClick={() => changeBox(activeBox - 1)} className="cursor-pointer"><ChevronLeftIcon /></Button>
-          <div className="flex items-center gap-1.5 px-1" role="tablist">{boxes.map((candidate, index) => <button type="button" key={candidate.id} role="tab" aria-selected={activeBox === index} aria-label={`切换到${candidate.label}`} onClick={() => changeBox(index)} className={cn("relative flex min-h-11 min-w-14 cursor-pointer flex-col items-center justify-center px-2 text-center transition-all duration-300", activeBox === index ? "-translate-y-0.5 text-foreground" : "text-muted-foreground hover:-translate-y-0.5 hover:text-foreground")}><span className={cn("absolute inset-x-2 bottom-0 h-px transition-colors", activeBox === index ? "bg-foreground" : "bg-transparent")} /><span aria-hidden="true" className={cn("relative mb-1 block h-3.5 w-8 transition-opacity", activeBox === index ? "opacity-100" : "opacity-55")}><span className="absolute left-1 top-0 h-1.5 w-6 -skew-x-12 border border-foreground/35 bg-muted/80" /><span className="absolute left-0.5 top-1.5 h-1.5 w-6 -skew-x-12 border border-foreground/25 bg-muted/55" /><span className="absolute left-1.5 top-3 h-1.5 w-6 -skew-x-12 border border-foreground/20 bg-muted/35" /></span><span className="font-mono text-xs font-semibold">{candidate.label}</span><span className="mt-0.5 text-[10px]">{candidate.subtitle}</span></button>)}</div>
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="下一个盒子" onClick={() => changeBox(activeBox + 1)} className="cursor-pointer"><ChevronRightIcon /></Button><span className="mx-1 hidden h-5 w-px bg-border sm:block" /><Button type="button" variant="ghost" size="icon-sm" aria-label="新增收纳盒" title="新增收纳盒" onClick={openAdd} className="cursor-pointer"><PlusIcon /></Button><Button type="button" variant="ghost" size="icon-sm" aria-label="重命名当前收纳盒" title="重命名" onClick={openRename} className="cursor-pointer"><PencilIcon /></Button><Button type="button" variant="ghost" size="icon-sm" aria-label="删除当前收纳盒" title="删除收纳盒" onClick={removeBox} disabled={boxes.length <= 1} className="cursor-pointer"><Trash2Icon /></Button>
+    <section aria-labelledby="location-map-title" className="overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-xs">
+      <div className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+        <div className="shrink-0">
+          <div className="flex items-center gap-2">
+            <MapPinIcon className="size-4 text-muted-foreground" />
+            <h3 id="location-map-title" className="text-sm font-semibold">收纳盒总览</h3>
+            <Badge variant="outline" className="font-mono text-[10px] font-normal">7 × 8 · 3D</Badge>
+          </div>
+          <p className="mt-1.5 pl-6 text-xs text-muted-foreground">拖动旋转，滚轮缩放，点击货位查看元件。</p>
+        </div>
+        <div className="-mx-2 flex min-w-0 items-center overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <Button type="button" variant="ghost" size="icon" aria-label="上一个元件盒" title="上一个元件盒" onClick={() => carouselApi?.scrollPrev()} disabled={boxes.length <= 1} className="size-11 shrink-0 cursor-pointer"><ChevronLeftIcon /></Button>
+          <div role="tablist" aria-label="选择收纳盒" className="flex h-14 shrink-0 items-stretch">
+            {boxes.map((candidate, index) => {
+              const isActive = index === activeBox
+              return (
+                <button
+                  key={candidate.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={`storage-box-panel-${candidate.id}`}
+                  title={`${candidate.label} · ${candidate.subtitle}`}
+                  onClick={() => carouselApi?.scrollTo(index)}
+                  className={cn(
+                    "relative flex min-w-18 cursor-pointer flex-col items-center justify-center px-2 text-center transition-colors duration-200 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                    "after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:origin-center after:scale-x-0 after:bg-orange-500 after:transition-transform after:duration-200 dark:after:bg-lime-400",
+                    isActive && "after:scale-x-100",
+                  )}
+                >
+                  <StorageBoxThumbnail active={isActive} />
+                  <span className="-mt-0.5 max-w-20 truncate text-[11px] font-semibold leading-4">{candidate.label}</span>
+                  <span className="max-w-20 truncate text-[9px] leading-3 text-muted-foreground">{candidate.subtitle}</span>
+                </button>
+              )
+            })}
+          </div>
+          <Button type="button" variant="ghost" size="icon" aria-label="下一个元件盒" title="下一个元件盒" onClick={() => carouselApi?.scrollNext()} disabled={boxes.length <= 1} className="size-11 shrink-0 cursor-pointer"><ChevronRightIcon /></Button>
+          <div aria-hidden="true" className="mx-2 h-6 w-px shrink-0 bg-border" />
+          <Button type="button" variant="ghost" size="icon" aria-label="新增收纳盒" title="新增收纳盒" onClick={openAdd} className="size-11 shrink-0 cursor-pointer"><PlusIcon /></Button>
+          <Button type="button" variant="ghost" size="icon" aria-label="编辑当前收纳盒" title="编辑收纳盒" onClick={openRename} className="size-11 shrink-0 cursor-pointer"><PencilIcon /></Button>
+          <Button type="button" variant="ghost" size="icon" aria-label="删除当前收纳盒" title="删除收纳盒" onClick={removeBox} disabled={boxes.length <= 1} className="size-11 shrink-0 cursor-pointer"><Trash2Icon /></Button>
         </div>
       </div>
-      <div className="relative border-t border-border/50 bg-muted/20 px-3 py-4 sm:px-6"><div className="pointer-events-none absolute inset-x-1/2 top-1/2 h-52 w-[min(72vw,38rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted/80 blur-3xl" /><ThreeStorageScene box={box} locations={locations} selectedCell={selectedCell} onSelect={selectCell} onHover={setHoveredCell} />{hoveredCell ? <div className="pointer-events-none absolute left-4 top-4 max-w-[min(90%,22rem)] border-l-2 border-lime-500 bg-background/90 px-3 py-2 text-xs shadow-sm backdrop-blur-sm sm:left-6"><div className="font-mono text-[10px] text-muted-foreground">{locationFor(hoveredCell)}</div>{hoveredItems.length ? <div className="mt-1 space-y-0.5">{hoveredItems.map((item) => <p key={item.id} className="truncate font-medium">{item.name} · {item.value} · {item.quantity} pcs</p>)}</div> : <p className="mt-1 text-muted-foreground">空货位 · 点击后快速录入元件</p>}</div> : null}<div className="pointer-events-none absolute bottom-4 left-4 right-4 flex flex-col gap-2 text-xs sm:left-6 sm:right-6 sm:flex-row sm:items-end sm:justify-between"><div className="flex items-center gap-3 text-muted-foreground"><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-lime-500" />已占用 {occupied}</span><span>空位 {56 - occupied}</span>{unassigned > 0 ? <span className="text-amber-700 dark:text-amber-400">未分配 {unassigned}</span> : null}</div>{selectedCell ? <div className="max-w-full border-l-2 border-foreground/20 pl-3 sm:max-w-sm"><div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground"><BoxIcon className="size-3" />{locationFor(selectedCell)}</div>{selectedItems.length ? <p className="mt-1 truncate font-medium">{selectedItems.map((item) => `${item.name} · ${item.value}`).join("、")}</p> : <p className="mt-1 text-muted-foreground">这是一个空货位</p>}</div> : <p className="text-right text-muted-foreground">选择一个货位</p>}</div></div>
+      <Carousel
+        setApi={setCarouselApi}
+        orientation="horizontal"
+        opts={{ loop: boxes.length > 1, align: "start", watchDrag: false }}
+        aria-label="元件盒三维视图"
+        className="border-t border-border bg-card"
+      >
+        <CarouselContent className="ml-0">
+          {boxes.map((candidate, index) => {
+            const candidateLocations = locationsByBox.get(candidate.id) ?? new Map<string, ComponentItem[]>()
+            const isActive = index === activeBox
+            const shouldRender = renderedBoxes.includes(index)
+
+            return (
+              <CarouselItem id={`storage-box-panel-${candidate.id}`} key={candidate.id} className="pl-0" aria-label={`${candidate.label}，第 ${index + 1} 个，共 ${boxes.length} 个`}>
+                <div className={cn("relative bg-card", !isActive && "pointer-events-none")} aria-hidden={!isActive}>
+                  {shouldRender ? (
+                    <ThreeStorageScene
+                      label={candidate.label}
+                      subtitle={candidate.subtitle}
+                      locations={candidateLocations}
+                      selectedCell={isActive ? selectedCell : null}
+                      onSelect={(cell) => isActive && selectCell(cell)}
+                      onHover={(cell) => isActive && setHoveredCell(cell)}
+                    />
+                  ) : (
+                    <div className="h-[360px] w-full sm:h-[430px]" />
+                  )}
+                </div>
+              </CarouselItem>
+            )
+          })}
+        </CarouselContent>
+        {hoveredCell ? (
+          <div className="pointer-events-none absolute right-5 top-5 z-10 max-w-[min(70%,22rem)] border-l-2 border-orange-500 bg-card/90 px-3 py-2 text-xs shadow-sm backdrop-blur-sm dark:border-lime-400 sm:right-6">
+            <div className="font-mono text-[10px] text-muted-foreground">{locationFor(hoveredCell)}</div>
+            {hoveredItems.length ? (
+              <div className="mt-1 space-y-0.5">
+                {hoveredItems.map((item) => <p key={item.id} className="truncate font-medium">{item.name} · {item.value} · {item.quantity} pcs</p>)}
+              </div>
+            ) : <p className="mt-1 text-muted-foreground">空货位 · 点击后快速录入元件</p>}
+          </div>
+        ) : null}
+        <div className="pointer-events-none absolute bottom-4 left-5 right-5 z-10 flex flex-col gap-2 text-xs sm:left-6 sm:right-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-orange-500 dark:bg-lime-400" />已占用 {occupied}</span>
+            <span>空位 {56 - occupied}</span>
+            {unassigned > 0 ? <span className="text-amber-700 dark:text-amber-400">未分配 {unassigned}</span> : null}
+          </div>
+          {selectedCell ? (
+            <div className="max-w-full border-l-2 border-foreground/20 pl-3 sm:max-w-sm">
+              <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground"><BoxIcon className="size-3" />{locationFor(selectedCell)}</div>
+              {selectedItems.length ? <p className="mt-1 truncate font-medium">{selectedItems.map((item) => `${item.name} · ${item.value}`).join("、")}</p> : <p className="mt-1 text-muted-foreground">这是一个空货位</p>}
+            </div>
+          ) : null}
+        </div>
+      </Carousel>
       <AddComponentDialog categories={categories} open={entryOpen} onOpenChange={setEntryOpen} initialLocation={entryLocation} locationReadOnly showTrigger={false} />
-      <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}><DialogContent><DialogHeader><DialogTitle>{dialog === "add" ? "新增收纳盒" : "重命名收纳盒"}</DialogTitle><DialogDescription>{dialog === "add" ? "新增的盒子会保存在当前设备，并立即加入右上角导航。" : `修改${box.label}的显示名称，不会改变已有货位坐标。`}</DialogDescription></DialogHeader><div className="space-y-2"><Label htmlFor="storage-box-name">盒子名称</Label><Input id="storage-box-name" value={draftName} onChange={(event) => setDraftName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && submitDialog()} autoFocus /></div><DialogFooter><DialogClose render={<Button variant="outline" className="cursor-pointer" />}>取消</DialogClose><Button type="button" onClick={submitDialog} disabled={!draftName.trim()} className="cursor-pointer">保存</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{dialog === "add" ? "新增收纳盒" : "编辑收纳盒"}</DialogTitle>
+            <DialogDescription>
+              {dialog === "add" ? "填写名称和说明，新盒子会立即加入顶部导航。" : `修改${box.label}的名称和说明，不会改变已有货位坐标。`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="storage-box-name">盒子名称</Label>
+              <Input
+                id="storage-box-name"
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && submitDialog()}
+                maxLength={24}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="storage-box-subtitle">盒子说明</Label>
+              <Input
+                id="storage-box-subtitle"
+                value={draftSubtitle}
+                onChange={(event) => setDraftSubtitle(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && submitDialog()}
+                placeholder="例如：电阻 / 电容"
+                maxLength={40}
+              />
+              <p className="text-xs text-muted-foreground">显示在顶部导航与 3D 标签中，可留空。</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" className="cursor-pointer" />}>取消</DialogClose>
+            <Button type="button" onClick={submitDialog} disabled={!draftName.trim()} className="cursor-pointer">保存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }
