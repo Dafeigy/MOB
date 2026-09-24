@@ -14,7 +14,7 @@ import { MovementsView } from "@/components/views/movements-view"
 import { AlertsView } from "@/components/views/alerts-view"
 import { WaitlistView } from "@/components/views/waitlist-view"
 import { inventoryOverview } from "@/lib/inventory-types"
-import { createMovement, deleteStorageBox, saveComponent, saveStorageBox, type Snapshot, type SyncReport } from "./api"
+import { createMovement, deleteStorageBox, saveComponent, saveStorageBox, setStockQuantity, type Snapshot, type SyncReport } from "./api"
 import { DesktopSettings } from "./settings"
 
 function DesktopLink({ href, ...props }: NavigationLinkProps) { return <a {...props} href={`#${href}`} /> }
@@ -53,6 +53,7 @@ export function DesktopApp() {
       updateComponent: (id, data) => mutate(saveComponent(data, id)),
       deleteComponent: (id) => mutate(invoke("delete_component", { id })),
       createMovement: (data) => mutate(createMovement(data)),
+      setStockQuantity: (id, quantity, note) => mutate(setStockQuantity(id, quantity, note)),
       createStorageBox: (id, label, subtitle) => mutate(saveStorageBox(id, label, subtitle)),
       updateStorageBox: (id, label, subtitle) => mutate(saveStorageBox(id, label, subtitle)),
       deleteStorageBox: (id) => mutate(deleteStorageBox(id)),

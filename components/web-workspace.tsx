@@ -24,6 +24,7 @@ export function WebWorkspace({ children }: { children: ReactNode }) {
       updateComponent: (id, data) => mutate(`/api/components/${encodeURIComponent(id)}`, "PATCH", data),
       deleteComponent: (id) => mutate(`/api/components/${encodeURIComponent(id)}`, "DELETE"),
       createMovement: (data) => mutate("/api/movements", "POST", data),
+      setStockQuantity: (id, quantity, note) => mutate(`/api/components/${encodeURIComponent(id)}/stock`, "PATCH", { quantity, note }),
       createStorageBox: (id, label, subtitle) => mutate("/api/storage-boxes", "POST", { id, label, subtitle }),
       updateStorageBox: (id, label, subtitle) => mutate(`/api/storage-boxes/${encodeURIComponent(id)}`, "PATCH", { label, subtitle }),
       deleteStorageBox: (id) => mutate(`/api/storage-boxes/${encodeURIComponent(id)}`, "DELETE"),

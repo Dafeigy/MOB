@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as THREE from "three"
-import { BoxIcon, ChevronLeftIcon, ChevronRightIcon, MapPinIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { ArchiveIcon, BoxIcon, ChevronLeftIcon, ChevronRightIcon, MapPinIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AddComponentDialog } from "@/components/add-component-dialog"
+import { UpdateStockQuantityDrawer } from "@/components/update-stock-quantity-drawer"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -53,19 +54,19 @@ function getThemeColors() {
         edgeOpacity: 0.9,
       }
     : {
-        top: 0xd8dde1,
-        side: 0xb9c2ca,
-        border: 0x929da7,
-        slot: 0xe5e9ec,
+        top: 0xe9edf0,
+        side: 0xd0d8de,
+        border: 0xb0bac2,
+        slot: 0xf1f4f6,
         occupied: 0xf59e0b,
         occupiedOpacity: 0.46,
         accent: 0xc4ccd3,
-        edge: 0x5e6974,
+        edge: 0x84909a,
         surfaceOpacity: 1,
         sideOpacity: 1,
         rimOpacity: 1,
         slotOpacity: 1,
-        edgeOpacity: 0.88,
+        edgeOpacity: 0.82,
       }
 }
 
@@ -94,11 +95,9 @@ function setMaterialOpacity(object: THREE.Mesh | THREE.LineSegments, opacity: nu
 
 function StorageBoxThumbnail({ active }: { active: boolean }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 44 28" className="h-7 w-11 overflow-visible fill-none">
-      <path d="M9 6.5h27l-2.5 10H6.5L9 6.5Z" className={cn("fill-muted/45 stroke-muted-foreground/55", active && "fill-foreground/8 stroke-foreground")} />
-      <path d="M6.5 16.5h27l-1.5 5H5l1.5-5Z" className={cn("fill-muted/70 stroke-muted-foreground/55", active && "fill-foreground/12 stroke-foreground")} />
-      <path d="M12 10h20M10.5 13.5h20" className={cn("stroke-muted-foreground/35", active && "stroke-foreground/55")} />
-    </svg>
+    <span className={cn("grid h-7 w-11 place-items-center", active ? "text-foreground" : "text-muted-foreground")}>
+      <ArchiveIcon aria-hidden="true" className="size-6" strokeWidth={1.5} />
+    </span>
   )
 }
 
@@ -465,16 +464,20 @@ export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { ite
   const [selectedCell, setSelectedCell] = useState<Cell | null>(null)
   const [hoveredCell, setHoveredCell] = useState<Cell | null>(null)
   const [entryOpen, setEntryOpen] = useState(false)
+  const [quantityOpen, setQuantityOpen] = useState(false)
   const [entryLocation, setEntryLocation] = useState("")
   const [dialog, setDialog] = useState<"add" | "rename" | null>(null)
   const [draftName, setDraftName] = useState("")
   const [draftSubtitle, setDraftSubtitle] = useState("")
 
   const box = boxes[activeBox] ?? boxes[0]
+  const visibleBoxStart = Math.min(Math.max(activeBox - 1, 0), Math.max(boxes.length - 3, 0))
+  const visibleBoxes = boxes.slice(visibleBoxStart, visibleBoxStart + 3)
   const locationsByBox = useMemo(() => {
     const boxMaps = new Map<string, Map<string, ComponentItem[]>>()
     for (const candidate of boxes) boxMaps.set(candidate.id, new Map())
     for (const item of items) {
+      if (item.quantity <= 0) continue
       const parsed = parseLocation(item.location)
       if (!parsed) continue
       const map = boxMaps.get(parsed.boxId)
@@ -530,6 +533,11 @@ export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { ite
   function selectCell(cell: Cell | null) {
     setSelectedCell(cell)
     if (!cell) return
+    const cellItems = locations.get(`${cell.x}-${cell.y}`) ?? []
+    if (cellItems.length > 0) {
+      setQuantityOpen(true)
+      return
+    }
     setEntryLocation(locationFor(cell))
     setEntryOpen(true)
   }
@@ -563,12 +571,13 @@ export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { ite
             <h3 id="location-map-title" className="text-sm font-semibold">收纳盒总览</h3>
             <Badge variant="outline" className="font-mono text-[10px] font-normal">7 × 8 · 3D</Badge>
           </div>
-          <p className="mt-1.5 pl-6 text-xs text-muted-foreground">拖动旋转，滚轮缩放，点击货位查看元件。</p>
+          <p className="mt-1.5 pl-6 text-xs text-muted-foreground">拖动旋转，滚轮缩放；点击空位快速录入，点击已占用货位修改库存。</p>
         </div>
-        <div className="-mx-2 flex min-w-0 items-center overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="-mx-2 flex min-w-0 items-center justify-end overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <Button type="button" variant="ghost" size="icon" aria-label="上一个元件盒" title="上一个元件盒" onClick={() => carouselApi?.scrollPrev()} disabled={boxes.length <= 1} className="size-11 shrink-0 cursor-pointer"><ChevronLeftIcon /></Button>
           <div role="tablist" aria-label="选择收纳盒" className="flex h-14 shrink-0 items-stretch">
-            {boxes.map((candidate, index) => {
+            {visibleBoxes.map((candidate, visibleIndex) => {
+              const index = visibleBoxStart + visibleIndex
               const isActive = index === activeBox
               return (
                 <button
@@ -658,6 +667,7 @@ export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { ite
         </div>
       </Carousel>
       <AddComponentDialog categories={categories} open={entryOpen} onOpenChange={setEntryOpen} initialLocation={entryLocation} locationReadOnly showTrigger={false} />
+      <UpdateStockQuantityDrawer items={selectedItems} location={selectedCell ? locationFor(selectedCell) : ""} open={quantityOpen} onOpenChange={setQuantityOpen} />
       <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
         <DialogContent>
           <DialogHeader>

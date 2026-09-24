@@ -12,7 +12,7 @@ import type { ComponentItem } from "@/lib/inventory-types"
 
 const fields = [
   ["name", "元件名称", true], ["category", "分类", true], ["package", "封装", true], ["value", "参数 / 阻容值", false],
-  ["location", "货位", false], ["quantity", "当前库存", true], ["minQuantity", "安全库存", false], ["unitPrice", "单价（元）", false],
+  ["location", "货位", false], ["minQuantity", "安全库存", false], ["unitPrice", "单价（元）", false],
 ] as const
 
 export function EditComponentDialog({ item }: { item: ComponentItem }) {
@@ -26,6 +26,7 @@ export function EditComponentDialog({ item }: { item: ComponentItem }) {
     setPending(true)
     setMessage("")
     const data = Object.fromEntries(new FormData(event.currentTarget))
+    data.quantity = String(item.quantity)
     try {
       await actions.updateComponent(item.id, data)
       setOpen(false)
@@ -42,15 +43,19 @@ export function EditComponentDialog({ item }: { item: ComponentItem }) {
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>编辑元件</DrawerTitle>
-          <DrawerDescription>更新基础资料、库存安全线与货位信息。</DrawerDescription>
+          <DrawerDescription>更新基础资料、安全库存与货位信息；库存数量请通过出入库操作调整。</DrawerDescription>
         </DrawerHeader>
         <form onSubmit={submit} className="mx-auto w-full max-w-2xl space-y-5 px-5 pt-5">
           <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
             {fields.map(([name, label, required]) => {
               const value = name === "minQuantity" ? item.min_quantity ?? "" : name === "unitPrice" ? item.unit_price ?? "" : item[name]
-              const numeric = name === "quantity" || name === "minQuantity" || name === "unitPrice"
+              const numeric = name === "minQuantity" || name === "unitPrice"
               return <div key={name} className="space-y-2"><Label htmlFor={`edit-${name}`}>{label}{required ? <span className="text-destructive"> *</span> : null}</Label><Input id={`edit-${name}`} name={name} type={numeric ? "number" : "text"} min={numeric ? "0" : undefined} step={name === "unitPrice" ? "0.001" : numeric ? "1" : undefined} defaultValue={value} required={required} /></div>
-            })}
+          })}
+          <div className="space-y-2">
+            <Label htmlFor="edit-current-quantity">当前库存</Label>
+            <Input id="edit-current-quantity" value={item.quantity} readOnly aria-readonly="true" />
+          </div>
             <div className="space-y-2 sm:col-span-2"><Label htmlFor="edit-notes">备注说明</Label><Input id="edit-notes" name="notes" defaultValue={item.notes} placeholder="采购渠道、替代料或使用提示" /></div>
           </div>
           {message ? <p role="alert" className="text-sm text-destructive">{message}</p> : null}

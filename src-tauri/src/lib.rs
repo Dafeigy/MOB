@@ -58,6 +58,11 @@ fn create_movement(state: State<AppState>, input: MovementInput) -> Result<(), S
 }
 
 #[tauri::command]
+fn set_stock_quantity(state: State<AppState>, id: String, quantity: i64, note: String) -> Result<(), String> {
+    db::set_stock_quantity(&mut *state.connection()?, &id, quantity, &note)
+}
+
+#[tauri::command]
 fn cloud_config(state: State<AppState>) -> Result<config::ConfigView, String> {
     config::view(&*state.connection()?)
 }
@@ -148,6 +153,7 @@ pub fn run() {
             save_storage_box,
             delete_storage_box,
             create_movement,
+            set_stock_quantity,
             cloud_config,
             save_cloud_config,
             test_cloud_connection,

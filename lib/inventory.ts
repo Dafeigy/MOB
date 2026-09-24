@@ -257,6 +257,33 @@ export async function updateComponent(id: string, input: NewComponent) {
   }
 }
 
+export async function setStockQuantity(id: string, quantity: number, note: string) {
+  if (!isD1Configured()) throw new Error("D1_NOT_CONFIGURED")
+  if (!Number.isSafeInteger(quantity) || quantity < 0) throw new Error("请填写有效的库存数量。")
+  await ensureSyncSchema()
+
+  const rows = await d1Query<Pick<ComponentItem, "quantity">>(
+    "SELECT quantity FROM components WHERE id = ? AND deleted_at IS NULL LIMIT 1",
+    [id],
+  )
+  const current = rows[0]?.quantity
+  if (current === undefined) throw new Error("COMPONENT_NOT_FOUND")
+  const difference = quantity - current
+  const statements = [{
+    sql: `UPDATE components SET quantity = ?, location = CASE WHEN ? = 0 THEN '' ELSE location END,
+          updated_at = ${nextVersion} WHERE id = ? AND deleted_at IS NULL`,
+    params: [quantity, quantity, id],
+  }]
+  if (difference !== 0) {
+    statements.push({
+      sql: `INSERT INTO stock_movements (id, component_id, type, quantity, note, created_at)
+            SELECT ?, id, ?, ?, ?, updated_at FROM components WHERE id = ? AND deleted_at IS NULL`,
+      params: [crypto.randomUUID(), difference > 0 ? "in" : "out", Math.abs(difference), note.trim(), id],
+    })
+  }
+  await d1Batch(statements)
+}
+
 export async function deleteComponent(id: string) {
   if (!isD1Configured()) throw new Error("D1_NOT_CONFIGURED")
   await ensureSyncSchema()
@@ -284,8 +311,8 @@ export async function createMovement(input: {
 
   await d1Batch([
     {
-      sql: `UPDATE components SET quantity = quantity + ?, updated_at = ${nextVersion} WHERE id = ? AND deleted_at IS NULL`,
-      params: [delta, input.componentId],
+      sql: `UPDATE components SET quantity = quantity + ?, location = CASE WHEN quantity + ? = 0 THEN '' ELSE location END, updated_at = ${nextVersion} WHERE id = ? AND deleted_at IS NULL`,
+      params: [delta, delta, input.componentId],
     },
     {
       sql: `INSERT INTO stock_movements

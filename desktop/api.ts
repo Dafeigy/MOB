@@ -24,6 +24,11 @@ export async function createMovement(data: InventoryForm) {
   await invoke("create_movement", { input: { componentId: String(data.componentId ?? ""), type: String(data.type ?? ""), quantity, note: String(data.note ?? "") } })
 }
 
+export async function setStockQuantity(id: string, quantity: number, note: string) {
+  if (!Number.isSafeInteger(quantity) || quantity < 0) throw new Error("请填写有效的库存数量。")
+  await invoke("set_stock_quantity", { id, quantity, note })
+}
+
 export async function saveStorageBox(id: string | null, label: string, subtitle = "") {
   await invoke("save_storage_box", { id, input: { label, subtitle } })
 }

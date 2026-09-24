@@ -8,6 +8,7 @@ export type InventoryActions = {
   updateComponent: (id: string, data: InventoryForm) => Promise<void>
   deleteComponent: (id: string) => Promise<void>
   createMovement: (data: InventoryForm) => Promise<void>
+  setStockQuantity: (id: string, quantity: number, note: string) => Promise<void>
   createStorageBox: (id: string, label: string, subtitle: string) => Promise<void>
   updateStorageBox: (id: string, label: string, subtitle: string) => Promise<void>
   deleteStorageBox: (id: string) => Promise<void>

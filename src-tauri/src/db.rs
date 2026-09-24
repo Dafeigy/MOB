@@ -260,11 +260,42 @@ pub fn create_movement(conn: &mut Connection, input: MovementInput) -> Result<()
         .ok_or("库存不足或数量超出范围。")?;
     let now = next_timestamp(Some(&current.updated_at))?;
     tx.execute(
-        "UPDATE components SET quantity=?,updated_at=?,dirty=1 WHERE id=?",
-        params![quantity, now, input.component_id],
+        "UPDATE components SET quantity=?,location=CASE WHEN ?=0 THEN '' ELSE location END,updated_at=?,dirty=1 WHERE id=?",
+        params![quantity, quantity, now, input.component_id],
     )
     .map_err(db_error)?;
     tx.execute("INSERT INTO stock_movements(id,component_id,type,quantity,note,created_at,dirty) VALUES(?,?,?,?,?,?,1)", params![uuid::Uuid::new_v4().to_string(),input.component_id,input.kind,input.quantity,input.note.trim(),now]).map_err(db_error)?;
+    tx.commit().map_err(db_error)
+}
+
+pub fn set_stock_quantity(
+    conn: &mut Connection,
+    id: &str,
+    quantity: i64,
+    note: &str,
+) -> Result<(), String> {
+    if !(0..=9_007_199_254_740_991).contains(&quantity) {
+        return Err("请填写有效的库存数量。".into());
+    }
+    let tx = conn.transaction().map_err(db_error)?;
+    let current = get_component(&tx, id)?
+        .filter(|component| component.deleted_at.is_none())
+        .ok_or("元件不存在或已删除。")?;
+    let difference = quantity - current.quantity;
+    let now = next_timestamp(Some(&current.updated_at))?;
+    tx.execute(
+        "UPDATE components SET quantity=?,location=CASE WHEN ?=0 THEN '' ELSE location END,updated_at=?,dirty=1 WHERE id=?",
+        params![quantity, quantity, now, id],
+    )
+    .map_err(db_error)?;
+    if difference != 0 {
+        let kind = if difference > 0 { "in" } else { "out" };
+        tx.execute(
+            "INSERT INTO stock_movements(id,component_id,type,quantity,note,created_at,dirty) VALUES(?,?,?,?,?,?,1)",
+            params![uuid::Uuid::new_v4().to_string(), id, kind, difference.abs(), note.trim(), now],
+        )
+        .map_err(db_error)?;
+    }
     tx.commit().map_err(db_error)
 }
 
