@@ -15,14 +15,15 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import type { InventoryOverview } from "@/lib/inventory-types"
+import type { ComponentItem, InventoryOverview, StorageBox } from "@/lib/inventory-types"
+import { InventoryLocationMap } from "@/components/inventory-location-map"
 
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("zh-CN").format(value)
 }
 
-export function DashboardView({ overview }: { overview: InventoryOverview }) {
+export function DashboardView({ overview, items = [], boxes = [] }: { overview: InventoryOverview; items?: ComponentItem[]; boxes?: StorageBox[] }) {
   const maxCategory = Math.max(...overview.categories.map((item) => item.quantity), 1)
 
   const stats = [
@@ -106,6 +107,8 @@ export function DashboardView({ overview }: { overview: InventoryOverview }) {
           )
         })}
       </section>
+
+      <InventoryLocationMap items={items} boxes={boxes} />
 
       <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="border-border shadow-xs">

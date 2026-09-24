@@ -1,7 +1,13 @@
 import { d1Batch, d1Query, isD1Configured, ensureSyncSchema } from "@/lib/d1"
 
-import { inventoryOverview, type ComponentItem, type StockMovement, type NewComponent } from "@/lib/inventory-types"
-export type { ComponentItem, StockMovement, NewComponent } from "@/lib/inventory-types"
+import { inventoryOverview, type ComponentItem, type StockMovement, type NewComponent, type StorageBox } from "@/lib/inventory-types"
+export type { ComponentItem, StockMovement, NewComponent, StorageBox } from "@/lib/inventory-types"
+
+const defaultStorageBoxes: StorageBox[] = [
+  { id: "A", label: "盒 01", subtitle: "电阻 / 电容", created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" },
+  { id: "B", label: "盒 02", subtitle: "二极管 / 连接器", created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" },
+  { id: "C", label: "盒 03", subtitle: "芯片 / 模块", created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" },
+]
 
 const demoComponents: ComponentItem[] = [
   {
@@ -169,6 +175,31 @@ export async function getRecentMovements(limit = 10) {
      LIMIT ?`,
     [limit],
   )
+}
+
+export async function getStorageBoxes() {
+  if (!isD1Configured()) return defaultStorageBoxes
+  await ensureSyncSchema()
+  return d1Query<StorageBox>("SELECT id, label, subtitle, created_at, updated_at FROM storage_boxes WHERE deleted_at IS NULL ORDER BY id")
+}
+
+export async function createStorageBox(id: string, label: string, subtitle: string) {
+  if (!isD1Configured()) throw new Error("D1_NOT_CONFIGURED")
+  await ensureSyncSchema()
+  const now = new Date().toISOString()
+  await d1Query("INSERT INTO storage_boxes (id, label, subtitle, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", [id, label.trim(), subtitle.trim(), now, now])
+}
+
+export async function updateStorageBox(id: string, label: string, subtitle: string) {
+  if (!isD1Configured()) throw new Error("D1_NOT_CONFIGURED")
+  await ensureSyncSchema()
+  await d1Query("UPDATE storage_boxes SET label = ?, subtitle = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND deleted_at IS NULL", [label.trim(), subtitle.trim(), id])
+}
+
+export async function deleteStorageBox(id: string) {
+  if (!isD1Configured()) throw new Error("D1_NOT_CONFIGURED")
+  await ensureSyncSchema()
+  await d1Query("UPDATE storage_boxes SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND deleted_at IS NULL", [id])
 }
 
 export async function getInventoryOverview() {

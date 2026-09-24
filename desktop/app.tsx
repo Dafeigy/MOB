@@ -14,7 +14,7 @@ import { MovementsView } from "@/components/views/movements-view"
 import { AlertsView } from "@/components/views/alerts-view"
 import { WaitlistView } from "@/components/views/waitlist-view"
 import { inventoryOverview } from "@/lib/inventory-types"
-import { createMovement, saveComponent, type Snapshot, type SyncReport } from "./api"
+import { createMovement, deleteStorageBox, saveComponent, saveStorageBox, type Snapshot, type SyncReport } from "./api"
 import { DesktopSettings } from "./settings"
 
 function DesktopLink({ href, ...props }: NavigationLinkProps) { return <a {...props} href={`#${href}`} /> }
@@ -53,6 +53,9 @@ export function DesktopApp() {
       updateComponent: (id, data) => mutate(saveComponent(data, id)),
       deleteComponent: (id) => mutate(invoke("delete_component", { id })),
       createMovement: (data) => mutate(createMovement(data)),
+      createStorageBox: (id, label, subtitle) => mutate(saveStorageBox(id, label, subtitle)),
+      updateStorageBox: (id, label, subtitle) => mutate(saveStorageBox(id, label, subtitle)),
+      deleteStorageBox: (id) => mutate(deleteStorageBox(id)),
     }
   }, [refresh])
 
@@ -62,7 +65,7 @@ export function DesktopApp() {
     try {
       const report = await invoke<SyncReport>("sync_inventory", { direction })
       await refresh()
-      setSyncMessage(`${direction === "push" ? "已推送" : "已拉取"} ${report.components} 项元件、${report.movements} 条流水${report.preserved ? `，保留 ${report.preserved} 项本地修改` : ""}`)
+      setSyncMessage(`${direction === "push" ? "已推送" : "已拉取"} ${report.components} 项元件、${report.movements} 条流水、${report.boxes} 个收纳盒${report.preserved ? `，保留 ${report.preserved} 项本地修改` : ""}`)
     } catch (error) { setSyncMessage(actionError(error)); setSyncFailed(true) }
     finally { setSyncing(null) }
   }
@@ -86,7 +89,7 @@ export function DesktopApp() {
           : !snapshot 
             ? <div role="status" aria-label="加载库存" className="grid min-h-64 place-items-center"><LoaderCircleIcon className="size-5 animate-spin" /></div> 
             : pathname === "/dashboard" 
-              ? <DashboardView overview={inventoryOverview(snapshot.components, snapshot.movements)} /> 
+              ? <DashboardView overview={inventoryOverview(snapshot.components, snapshot.movements)} items={snapshot.components} boxes={snapshot.boxes} />
               : pathname === "/movements" 
                 ? <MovementsView items={snapshot.components} movements={snapshot.movements} /> 
                 : pathname === "/waitlist" 

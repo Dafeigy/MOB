@@ -22,6 +22,14 @@ export type StockMovement = {
   created_at: string
 }
 
+export type StorageBox = {
+  id: string
+  label: string
+  subtitle: string
+  created_at: string
+  updated_at: string
+}
+
 export type NewComponent = Omit<ComponentItem, "id" | "updated_at">
 
 export function inventoryOverview(components: ComponentItem[], movements: StockMovement[], demoMode = false) {

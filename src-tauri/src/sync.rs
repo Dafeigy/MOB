@@ -1,6 +1,6 @@
 use crate::{
     config::CloudConfig,
-    db::{COMPONENT_COLUMNS, UPSERT_COMPONENT},
+    db::{BOX_COLUMNS, COMPONENT_COLUMNS, UPSERT_BOX, UPSERT_COMPONENT},
     models::*,
 };
 use serde::de::DeserializeOwned;
@@ -96,7 +96,7 @@ impl Cloud {
         Ok(())
     }
 
-    pub async fn download(&self) -> Result<(Vec<Component>, Vec<Movement>), String> {
+    pub async fn download(&self) -> Result<(Vec<Component>, Vec<Movement>, Vec<StorageBox>), String> {
         let components = self
             .pages::<Component>("components", COMPONENT_COLUMNS)
             .await?;
@@ -106,7 +106,8 @@ impl Cloud {
                 "id,component_id,type,quantity,note,created_at",
             )
             .await?;
-        Ok((components, movements))
+        let boxes = self.pages::<StorageBox>("storage_boxes", BOX_COLUMNS).await?;
+        Ok((components, movements, boxes))
     }
 
     async fn pages<T: DeserializeOwned + serde::Serialize>(
@@ -142,7 +143,8 @@ impl Cloud {
         &self,
         components: &[Component],
         movements: &[Movement],
-    ) -> Result<Vec<Component>, String> {
+        boxes: &[StorageBox],
+    ) -> Result<(Vec<Component>, Vec<StorageBox>), String> {
         // Timestamp comparisons use julianday to support both old SQLite dates and UTC ISO dates.
         let sql = format!("{UPSERT_COMPONENT} WHERE julianday(excluded.updated_at)>=julianday(components.updated_at)");
         for chunk in components.chunks(40) {
@@ -151,6 +153,11 @@ impl Cloud {
         }
         for chunk in movements.chunks(40) {
             let batch: Vec<_> = chunk.iter().map(|m| json!({ "sql": "INSERT INTO stock_movements(id,component_id,type,quantity,note,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING", "params": [m.id,m.component_id,m.kind,m.quantity,m.note,m.created_at] })).collect();
+            self.request(json!({"batch":batch}), batch.len()).await?;
+        }
+        let box_sql = format!("{UPSERT_BOX} WHERE julianday(excluded.updated_at)>=julianday(storage_boxes.updated_at)");
+        for chunk in boxes.chunks(40) {
+            let batch: Vec<_> = chunk.iter().map(|b| json!({ "sql": box_sql, "params": [b.id,b.label,b.subtitle,b.created_at,b.updated_at,b.deleted_at] })).collect();
             self.request(json!({"batch":batch}), batch.len()).await?;
         }
         let mut canonical = Vec::new();
@@ -167,7 +174,13 @@ impl Cloud {
                 .await?,
             );
         }
-        Ok(canonical)
+        let mut canonical_boxes = Vec::new();
+        for chunk in boxes.chunks(80) {
+            let placeholders = vec!["?"; chunk.len()].join(",");
+            let ids: Vec<_> = chunk.iter().map(|b| &b.id).collect();
+            canonical_boxes.extend(self.query::<StorageBox>(&format!("SELECT {BOX_COLUMNS} FROM storage_boxes WHERE id IN ({placeholders})"), json!(ids)).await?);
+        }
+        Ok((canonical, canonical_boxes))
     }
 }
 

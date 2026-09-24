@@ -43,6 +43,16 @@ fn delete_component(state: State<AppState>, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn save_storage_box(state: State<AppState>, id: Option<String>, input: StorageBoxInput) -> Result<(), String> {
+    db::save_storage_box(&mut *state.connection()?, id, input)
+}
+
+#[tauri::command]
+fn delete_storage_box(state: State<AppState>, id: String) -> Result<(), String> {
+    db::delete_storage_box(&mut *state.connection()?, &id)
+}
+
+#[tauri::command]
 fn create_movement(state: State<AppState>, input: MovementInput) -> Result<(), String> {
     db::create_movement(&mut *state.connection()?, input)
 }
@@ -83,25 +93,28 @@ async fn sync_inventory(
     let cloud = sync::Cloud::new(config)?;
     cloud.ensure_schema().await?;
     let report = if direction == "push" {
-        let (components, movements) = {
+        let (components, movements, boxes) = {
             let conn = state.connection()?;
-            (db::components(&conn, true)?, db::movements(&conn, true)?)
+            (db::components(&conn, true)?, db::movements(&conn, true)?, db::storage_boxes(&conn, true)?)
         };
-        let canonical = cloud.upload(&components, &movements).await?;
+        let (canonical, canonical_boxes) = cloud.upload(&components, &movements, &boxes).await?;
         let preserved = db::acknowledge_push(
             &mut *state.connection()?,
             &components,
             &canonical,
             &movements,
+            &boxes,
+            &canonical_boxes,
         )?;
         SyncReport {
             components: components.len(),
             movements: movements.len(),
+            boxes: boxes.len(),
             preserved,
         }
     } else {
-        let (components, movements) = cloud.download().await?;
-        db::apply_pull(&mut *state.connection()?, &components, &movements)?
+        let (components, movements, boxes) = cloud.download().await?;
+        db::apply_pull(&mut *state.connection()?, &components, &movements, &boxes)?
     };
     config::set_setting(
         &*state.connection()?,
@@ -132,6 +145,8 @@ pub fn run() {
             inventory_snapshot,
             save_component,
             delete_component,
+            save_storage_box,
+            delete_storage_box,
             create_movement,
             cloud_config,
             save_cloud_config,

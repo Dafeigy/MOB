@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api/core"
 import type { InventoryForm } from "@/components/inventory-actions"
-import type { ComponentItem, StockMovement } from "@/lib/inventory-types"
+import type { ComponentItem, StockMovement, StorageBox } from "@/lib/inventory-types"
 
-export type Snapshot = { components: ComponentItem[]; movements: StockMovement[]; pending: number }
+export type Snapshot = { components: ComponentItem[]; movements: StockMovement[]; boxes: StorageBox[]; pending: number }
 export type CloudConfig = { account_id: string; database_id: string; has_token: boolean; last_push: string | null; last_pull: string | null }
-export type SyncReport = { components: number; movements: number; preserved: number }
+export type SyncReport = { components: number; movements: number; boxes: number; preserved: number }
 
 function optionalNumber(value: unknown) { return value === "" || value === undefined || value === null ? null : Number(value) }
 
@@ -22,6 +22,14 @@ export async function createMovement(data: InventoryForm) {
   const quantity = Number(data.quantity)
   if (!Number.isSafeInteger(quantity) || quantity <= 0) throw new Error("请填写有效的出入库数量。")
   await invoke("create_movement", { input: { componentId: String(data.componentId ?? ""), type: String(data.type ?? ""), quantity, note: String(data.note ?? "") } })
+}
+
+export async function saveStorageBox(id: string | null, label: string, subtitle = "") {
+  await invoke("save_storage_box", { id, input: { label, subtitle } })
+}
+
+export async function deleteStorageBox(id: string) {
+  await invoke("delete_storage_box", { id })
 }
 
 // Parse only the three recognized values. Never execute shell expressions or import application secrets.

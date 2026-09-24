@@ -107,14 +107,14 @@ fn pull_preserves_unsent_local_edits_and_deletions() {
     let mut remote = c.clone();
     remote.quantity = 999;
     remote.updated_at = "2099-01-01T00:00:00.000Z".into();
-    let report = db::apply_pull(&mut conn, &[remote.clone()], &[]).unwrap();
+    let report = db::apply_pull(&mut conn, &[remote.clone()], &[], &[]).unwrap();
     assert_eq!(report.preserved, 1);
     assert_eq!(
         db::get_component(&conn, &c.id).unwrap().unwrap().quantity,
         30
     );
     db::delete_component(&mut conn, &c.id).unwrap();
-    db::apply_pull(&mut conn, &[remote], &[]).unwrap();
+    db::apply_pull(&mut conn, &[remote], &[], &[]).unwrap();
     assert!(db::get_component(&conn, &c.id)
         .unwrap()
         .unwrap()
@@ -130,9 +130,9 @@ fn pull_uses_newer_versions_and_never_replays_stock_changes() {
     let all = db::components(&remote, true).unwrap();
     let moves = db::movements(&remote, true).unwrap();
     let mut local = database();
-    let first = db::apply_pull(&mut local, &all, &moves).unwrap();
+    let first = db::apply_pull(&mut local, &all, &moves, &[]).unwrap();
     assert_eq!((first.components, first.movements), (1, 1));
-    let second = db::apply_pull(&mut local, &all, &moves).unwrap();
+    let second = db::apply_pull(&mut local, &all, &moves, &[]).unwrap();
     assert_eq!((second.components, second.movements), (0, 0));
     assert_eq!(
         db::get_component(&local, &c.id).unwrap().unwrap().quantity,
@@ -141,8 +141,8 @@ fn pull_uses_newer_versions_and_never_replays_stock_changes() {
     assert_eq!(db::snapshot(&local).unwrap().pending, 0);
     // Older snapshots cannot resurrect an already pulled deletion.
     db::delete_component(&mut remote, &c.id).unwrap();
-    db::apply_pull(&mut local, &db::components(&remote, true).unwrap(), &moves).unwrap();
-    db::apply_pull(&mut local, &all, &moves).unwrap();
+    db::apply_pull(&mut local, &db::components(&remote, true).unwrap(), &moves, &[]).unwrap();
+    db::apply_pull(&mut local, &all, &moves, &[]).unwrap();
     assert!(db::components(&local, false).unwrap().is_empty());
 }
 
@@ -160,7 +160,7 @@ fn failed_pull_rolls_back_all_rows() {
         component_name: String::new(),
     };
     let mut local = database();
-    assert!(db::apply_pull(&mut local, &[c], &[m]).is_err());
+    assert!(db::apply_pull(&mut local, &[c], &[m], &[]).is_err());
     assert!(db::components(&local, false).unwrap().is_empty());
 }
 
@@ -170,13 +170,13 @@ fn push_acknowledgement_preserves_edits_made_during_network_request() {
     let c = component(&mut conn, 30);
     db::create_movement(&mut conn, movement(&c.id, 2, "in")).unwrap();
     assert_eq!(
-        db::acknowledge_push(&mut conn, &[c.clone()], &[c], &[]).unwrap(),
+        db::acknowledge_push(&mut conn, &[c.clone()], &[c], &[], &[], &[]).unwrap(),
         1
     );
     let current = db::components(&conn, true).unwrap();
     assert_eq!(current[0].quantity, 32);
     let moves = db::movements(&conn, true).unwrap();
-    db::acknowledge_push(&mut conn, &current, &current, &moves).unwrap();
+    db::acknowledge_push(&mut conn, &current, &current, &moves, &[], &[]).unwrap();
     assert_eq!(db::snapshot(&conn).unwrap().pending, 0);
 }
 
@@ -184,7 +184,7 @@ fn push_acknowledgement_preserves_edits_made_during_network_request() {
 fn incomplete_push_ack_does_not_clear_pending_changes() {
     let mut conn = database();
     let c = component(&mut conn, 30);
-    assert!(db::acknowledge_push(&mut conn, &[c], &[], &[]).is_err());
+    assert!(db::acknowledge_push(&mut conn, &[c], &[], &[], &[], &[]).is_err());
     assert_eq!(db::snapshot(&conn).unwrap().pending, 1);
 }
 
@@ -195,7 +195,7 @@ fn newer_cloud_record_wins_when_push_is_acknowledged() {
     let mut remote = c.clone();
     remote.updated_at = "2099-01-01T00:00:00.000Z".into();
     remote.quantity = 21;
-    db::acknowledge_push(&mut conn, &[c.clone()], &[remote], &[]).unwrap();
+    db::acknowledge_push(&mut conn, &[c.clone()], &[remote], &[], &[], &[]).unwrap();
     assert_eq!(
         db::get_component(&conn, &c.id).unwrap().unwrap().quantity,
         21
@@ -261,7 +261,7 @@ fn remote_upsert_compares_old_and_new_date_formats() {
 fn config_round_trip_encrypts_token_and_target_switch_marks_all_dirty() {
     let mut conn = database();
     let c = component(&mut conn, 30);
-    db::acknowledge_push(&mut conn, &[c.clone()], &[c], &[]).unwrap();
+    db::acknowledge_push(&mut conn, &[c.clone()], &[c], &[], &[], &[]).unwrap();
     let input = config::ConfigInput {
         account_id: "a".repeat(32),
         database_id: "00000000-0000-4000-8000-000000000001".into(),

@@ -30,6 +30,16 @@ pub struct Movement {
     pub component_name: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct StorageBox {
+    pub id: String,
+    pub label: String,
+    pub subtitle: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub deleted_at: Option<String>,
+}
+
 #[derive(Deserialize)]
 pub struct ComponentInput {
     pub name: String,
@@ -41,6 +51,21 @@ pub struct ComponentInput {
     pub location: String,
     pub notes: String,
     pub unit_price: Option<f64>,
+}
+
+#[derive(Deserialize)]
+pub struct StorageBoxInput {
+    pub label: String,
+    pub subtitle: String,
+}
+
+impl StorageBoxInput {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.label.trim().is_empty() || self.label.trim().len() > 80 || self.subtitle.trim().len() > 120 {
+            return Err("请输入有效的盒子名称。".into());
+        }
+        Ok(())
+    }
 }
 
 impl ComponentInput {
@@ -75,6 +100,7 @@ pub struct MovementInput {
 pub struct Snapshot {
     pub components: Vec<Component>,
     pub movements: Vec<Movement>,
+    pub boxes: Vec<StorageBox>,
     pub pending: i64,
 }
 
@@ -82,5 +108,6 @@ pub struct Snapshot {
 pub struct SyncReport {
     pub components: usize,
     pub movements: usize,
+    pub boxes: usize,
     pub preserved: usize,
 }

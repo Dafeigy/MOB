@@ -8,6 +8,9 @@ export type InventoryActions = {
   updateComponent: (id: string, data: InventoryForm) => Promise<void>
   deleteComponent: (id: string) => Promise<void>
   createMovement: (data: InventoryForm) => Promise<void>
+  createStorageBox: (id: string, label: string, subtitle: string) => Promise<void>
+  updateStorageBox: (id: string, label: string, subtitle: string) => Promise<void>
+  deleteStorageBox: (id: string) => Promise<void>
 }
 
 export const InventoryActionsContext = createContext<InventoryActions | null>(null)

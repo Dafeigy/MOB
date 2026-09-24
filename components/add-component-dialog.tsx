@@ -18,15 +18,16 @@ const fields = [
   ["location", "货位", "例如：A-01-03", false],
 ] as const
 
-export function AddComponentDialog({ categories }: { categories: string[] }) {
+export function AddComponentDialog({ categories, open: controlledOpen, onOpenChange, initialLocation, locationReadOnly = false, showTrigger = true }: { categories: string[]; open?: boolean; onOpenChange?: (open: boolean) => void; initialLocation?: string; locationReadOnly?: boolean; showTrigger?: boolean }) {
   const actions = useInventoryActions()
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState("")
   const [category, setCategory] = useState("")
   const [categoryInput, setCategoryInput] = useState("")
   const [name, setName] = useState("")
   const [nameWasAutoFilled, setNameWasAutoFilled] = useState(false)
+  const open = controlledOpen ?? internalOpen
   const options = useMemo(() => Array.from(new Set([...defaultCategories, ...categories])).filter(Boolean), [categories])
 
   const autoNameCategories = new Set(["电阻", "电容", "电感"])
@@ -60,7 +61,8 @@ export function AddComponentDialog({ categories }: { categories: string[] }) {
   }
 
   function closeDialog(nextOpen: boolean) {
-    setOpen(nextOpen)
+    if (controlledOpen === undefined) setInternalOpen(nextOpen)
+    onOpenChange?.(nextOpen)
     if (!nextOpen) {
       setMessage("")
       setCategory("")
@@ -92,7 +94,7 @@ export function AddComponentDialog({ categories }: { categories: string[] }) {
 
   return (
     <Drawer open={open} onOpenChange={closeDialog} swipeDirection="right">
-      <DrawerTrigger render={<Button className="cursor-pointer" />}><PlusIcon />新增元件</DrawerTrigger>
+      {showTrigger ? <DrawerTrigger render={<Button className="cursor-pointer" />}><PlusIcon />新增元件</DrawerTrigger> : null}
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>新增元件</DrawerTitle>
@@ -126,7 +128,7 @@ export function AddComponentDialog({ categories }: { categories: string[] }) {
             {fields.map(([fieldName, label, placeholder, required]) => (
               <div key={fieldName} className="space-y-2">
                 <Label htmlFor={fieldName}>{label} {required ? <span className="text-destructive">*</span> : null}</Label>
-                <Input id={fieldName} name={fieldName} value={fieldName === "name" ? name : undefined} placeholder={placeholder} required={required} onChange={fieldName === "name" ? (event) => changeName(event.target.value) : undefined} />
+                <Input id={fieldName} name={fieldName} value={fieldName === "name" ? name : fieldName === "location" && initialLocation ? initialLocation : undefined} readOnly={fieldName === "location" && locationReadOnly} placeholder={placeholder} required={required} onChange={fieldName === "name" ? (event) => changeName(event.target.value) : undefined} />
               </div>
             ))}
             <div className="space-y-2"><Label htmlFor="quantity">初始库存</Label><Input id="quantity" name="quantity" type="number" min="0" step="1" defaultValue="0" required /></div>

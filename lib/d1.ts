@@ -87,6 +87,13 @@ export function ensureSyncSchema() {
         if (!refreshed.some((column) => column.name === "deleted_at")) throw error
       }
     }
+    const boxTable = await d1Query<{ name: string }>("PRAGMA table_info(storage_boxes)")
+    if (!boxTable.length) {
+      await d1Batch([
+        { sql: "CREATE TABLE IF NOT EXISTS storage_boxes (id TEXT PRIMARY KEY, label TEXT NOT NULL, subtitle TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT)", params: [] },
+        { sql: "INSERT OR IGNORE INTO storage_boxes (id,label,subtitle,created_at,updated_at) VALUES ('A','盒 01','电阻 / 电容',strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')),('B','盒 02','二极管 / 连接器',strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')),('C','盒 03','芯片 / 模块',strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))", params: [] },
+      ])
+    }
   })().catch((error) => { syncSchema = undefined; throw error })
   return syncSchema
 }

@@ -4,6 +4,8 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 
 pub const COMPONENT_COLUMNS: &str = "id, name, category, package, value, quantity, min_quantity, location, notes, unit_price, created_at, updated_at, deleted_at";
 pub const UPSERT_COMPONENT: &str = "INSERT INTO components (id,name,category,package,value,quantity,min_quantity,location,notes,unit_price,created_at,updated_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,category=excluded.category,package=excluded.package,value=excluded.value,quantity=excluded.quantity,min_quantity=excluded.min_quantity,location=excluded.location,notes=excluded.notes,unit_price=excluded.unit_price,created_at=excluded.created_at,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at";
+pub const BOX_COLUMNS: &str = "id, label, subtitle, created_at, updated_at, deleted_at";
+pub const UPSERT_BOX: &str = "INSERT INTO storage_boxes (id,label,subtitle,created_at,updated_at,deleted_at) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET label=excluded.label,subtitle=excluded.subtitle,created_at=excluded.created_at,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at";
 
 pub fn initialize(conn: &mut Connection) -> Result<(), String> {
     conn.busy_timeout(std::time::Duration::from_secs(5))
@@ -13,7 +15,7 @@ pub fn initialize(conn: &mut Connection) -> Result<(), String> {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .map_err(db_error)?;
-    if version > 1 {
+    if version > 2 {
         return Err("本地数据库版本较新，请升级 Retos。".into());
     }
     if version == 0 {
@@ -23,12 +25,26 @@ pub fn initialize(conn: &mut Connection) -> Result<(), String> {
         tx.execute_batch(
             "ALTER TABLE components ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0;
             ALTER TABLE stock_movements ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE storage_boxes ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0;
             CREATE TABLE local_settings (key TEXT PRIMARY KEY, value BLOB NOT NULL);
-            PRAGMA user_version=1;",
+            PRAGMA user_version=2;",
         )
         .map_err(db_error)?;
         tx.commit().map_err(db_error)?;
     }
+    if version == 1 {
+        let tx = conn.transaction().map_err(db_error)?;
+        tx.execute_batch(include_str!("../../scripts/d1-migration-004-storage-boxes.sql"))
+            .map_err(db_error)?;
+        tx.execute_batch(
+            "ALTER TABLE storage_boxes ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0;
+             PRAGMA user_version=2;",
+        )
+        .map_err(db_error)?;
+        tx.commit().map_err(db_error)?;
+    }
+    conn.execute_batch("INSERT OR IGNORE INTO storage_boxes (id,label,subtitle) VALUES ('A','盒 01','电阻 / 电容'),('B','盒 02','二极管 / 连接器'),('C','盒 03','芯片 / 模块');")
+        .map_err(db_error)?;
     Ok(())
 }
 
@@ -108,8 +124,18 @@ pub fn movements(conn: &Connection, dirty_only: bool) -> Result<Vec<Movement>, S
         .collect::<Result<Vec<_>, _>>().map_err(db_error)
 }
 
+pub fn storage_boxes(conn: &Connection, dirty_only: bool) -> Result<Vec<StorageBox>, String> {
+    let suffix = if dirty_only { "WHERE dirty=1" } else { "WHERE deleted_at IS NULL ORDER BY id" };
+    conn.prepare(&format!("SELECT {BOX_COLUMNS} FROM storage_boxes {suffix}"))
+        .map_err(db_error)?
+        .query_map([], |r| Ok(StorageBox { id: r.get(0)?, label: r.get(1)?, subtitle: r.get(2)?, created_at: r.get(3)?, updated_at: r.get(4)?, deleted_at: r.get(5)? }))
+        .map_err(db_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(db_error)
+}
+
 pub fn snapshot(conn: &Connection) -> Result<Snapshot, String> {
-    Ok(Snapshot { components: components(conn, false)?, movements: movements(conn, false)?, pending: conn.query_row("SELECT (SELECT COUNT(*) FROM components WHERE dirty=1)+(SELECT COUNT(*) FROM stock_movements WHERE dirty=1)", [], |r| r.get(0)).map_err(db_error)? })
+    Ok(Snapshot { components: components(conn, false)?, movements: movements(conn, false)?, boxes: storage_boxes(conn, false)?, pending: conn.query_row("SELECT (SELECT COUNT(*) FROM components WHERE dirty=1)+(SELECT COUNT(*) FROM stock_movements WHERE dirty=1)+(SELECT COUNT(*) FROM storage_boxes WHERE dirty=1)", [], |r| r.get(0)).map_err(db_error)? })
 }
 
 pub fn put_component(conn: &Connection, c: &Component) -> Result<(), String> {
@@ -133,6 +159,30 @@ pub fn put_component(conn: &Connection, c: &Component) -> Result<(), String> {
     )
     .map_err(db_error)?;
     Ok(())
+}
+
+pub fn put_storage_box(conn: &Connection, b: &StorageBox) -> Result<(), String> {
+    conn.execute(UPSERT_BOX, params![b.id, b.label, b.subtitle, b.created_at, b.updated_at, b.deleted_at]).map_err(db_error)?;
+    Ok(())
+}
+
+pub fn save_storage_box(conn: &mut Connection, id: Option<String>, input: StorageBoxInput) -> Result<(), String> {
+    input.validate()?;
+    let tx = conn.transaction().map_err(db_error)?;
+    let previous = if let Some(id) = &id { tx.query_row(&format!("SELECT {BOX_COLUMNS} FROM storage_boxes WHERE id=? AND deleted_at IS NULL"), [id], |r| Ok(StorageBox { id: r.get(0)?, label: r.get(1)?, subtitle: r.get(2)?, created_at: r.get(3)?, updated_at: r.get(4)?, deleted_at: r.get(5)? })).optional().map_err(db_error)? } else { None };
+    let now = next_timestamp(previous.as_ref().map(|b| b.updated_at.as_str()))?;
+    let storage_box = StorageBox { id: id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string()), label: input.label.trim().into(), subtitle: input.subtitle.trim().into(), created_at: previous.as_ref().map(|b| b.created_at.clone()).unwrap_or_else(|| now.clone()), updated_at: now, deleted_at: None };
+    put_storage_box(&tx, &storage_box)?;
+    tx.execute("UPDATE storage_boxes SET dirty=1 WHERE id=?", [&storage_box.id]).map_err(db_error)?;
+    tx.commit().map_err(db_error)
+}
+
+pub fn delete_storage_box(conn: &mut Connection, id: &str) -> Result<(), String> {
+    let tx = conn.transaction().map_err(db_error)?;
+    let current: StorageBox = tx.query_row(&format!("SELECT {BOX_COLUMNS} FROM storage_boxes WHERE id=? AND deleted_at IS NULL"), [id], |r| Ok(StorageBox { id: r.get(0)?, label: r.get(1)?, subtitle: r.get(2)?, created_at: r.get(3)?, updated_at: r.get(4)?, deleted_at: r.get(5)? })).optional().map_err(db_error)?.ok_or("收纳盒不存在。")?;
+    let now = next_timestamp(Some(&current.updated_at))?;
+    tx.execute("UPDATE storage_boxes SET deleted_at=?,updated_at=?,dirty=1 WHERE id=?", params![now, now, id]).map_err(db_error)?;
+    tx.commit().map_err(db_error)
 }
 
 pub fn save_component(
@@ -223,6 +273,7 @@ pub fn apply_pull(
     conn: &mut Connection,
     incoming: &[Component],
     movements: &[Movement],
+    incoming_boxes: &[StorageBox],
 ) -> Result<SyncReport, String> {
     let tx = conn.transaction().map_err(db_error)?;
     let mut report = SyncReport::default();
@@ -257,6 +308,18 @@ pub fn apply_pull(
         }
         report.movements += tx.execute("INSERT INTO stock_movements(id,component_id,type,quantity,note,created_at,dirty) VALUES(?,?,?,?,?,?,0) ON CONFLICT(id) DO NOTHING", params![m.id,m.component_id,m.kind,m.quantity,m.note,m.created_at]).map_err(db_error)?;
     }
+    for b in incoming_boxes {
+        let dirty: bool = tx.query_row("SELECT dirty FROM storage_boxes WHERE id=?", [&b.id], |r| r.get(0)).optional().map_err(db_error)?.unwrap_or(false);
+        if dirty {
+            report.preserved += 1;
+            continue;
+        }
+        let current: Option<StorageBox> = tx.query_row(&format!("SELECT {BOX_COLUMNS} FROM storage_boxes WHERE id=?"), [&b.id], |r| Ok(StorageBox { id: r.get(0)?, label: r.get(1)?, subtitle: r.get(2)?, created_at: r.get(3)?, updated_at: r.get(4)?, deleted_at: r.get(5)? })).optional().map_err(db_error)?;
+        if current.as_ref().map(|old| timestamp(&old.updated_at)).transpose()?.unwrap_or(-1) <= timestamp(&b.updated_at)? && current.as_ref() != Some(b) {
+            put_storage_box(&tx, b)?;
+            report.boxes += 1;
+        }
+    }
     tx.commit().map_err(db_error)?;
     Ok(report)
 }
@@ -267,6 +330,8 @@ pub fn acknowledge_push(
     sent: &[Component],
     received: &[Component],
     sent_movements: &[Movement],
+    sent_boxes: &[StorageBox],
+    received_boxes: &[StorageBox],
 ) -> Result<usize, String> {
     let tx = conn.transaction().map_err(db_error)?;
     let mut preserved = 0;
@@ -290,6 +355,19 @@ pub fn acknowledge_push(
     for m in sent_movements {
         tx.execute("UPDATE stock_movements SET dirty=0 WHERE id=?", [&m.id])
             .map_err(db_error)?;
+    }
+    for b in sent_boxes {
+        let current: StorageBox = tx.query_row(&format!("SELECT {BOX_COLUMNS} FROM storage_boxes WHERE id=?"), [&b.id], |r| Ok(StorageBox { id: r.get(0)?, label: r.get(1)?, subtitle: r.get(2)?, created_at: r.get(3)?, updated_at: r.get(4)?, deleted_at: r.get(5)? })).optional().map_err(db_error)?.ok_or("本地收纳盒缺失。")?;
+        if current.updated_at != b.updated_at {
+            preserved += 1;
+            continue;
+        }
+        let canonical = received_boxes.iter().find(|r| r.id == b.id).ok_or("云端未确认收纳盒写入，请重试。")?;
+        if timestamp(&canonical.updated_at)? < timestamp(&b.updated_at)? {
+            return Err("云端未确认最新收纳盒版本，请重试。".into());
+        }
+        put_storage_box(&tx, canonical)?;
+        tx.execute("UPDATE storage_boxes SET dirty=0 WHERE id=?", [&b.id]).map_err(db_error)?;
     }
     tx.commit().map_err(db_error)?;
     Ok(preserved)
