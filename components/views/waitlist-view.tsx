@@ -22,7 +22,7 @@ export function WaitlistView() {
   }, [])
 
   return (
-    <section className="relative isolate -m-4 min-h-[calc(100dvh-4rem)] overflow-hidden bg-background sm:-m-6 lg:-m-8">
+    <section className="relative isolate -m-4 min-h-[calc(100dvh-4rem)] overflow-hidden sm:-m-6 lg:-m-8">
       <div className="absolute inset-0" aria-hidden="true">
         <ParticleField
           src="/particle-brain.png"
@@ -48,7 +48,7 @@ export function WaitlistView() {
         className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-b from-transparent via-background/75 to-background"
       />
 
-      <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center px-6 pb-10 text-center sm:pb-14">
+      <div className="absolute items-center bottom-[40vh] justify-center inset-x-0 z-10 flex flex-col  px-6 pb-10 text-center sm:pb-14">
         {/* <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-background/65 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground shadow-sm backdrop-blur-md">
           <CircleDashedIcon className="size-3.5 animate-[spin_8s_linear_infinite]" aria-hidden="true" />
           Building in public

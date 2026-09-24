@@ -171,7 +171,7 @@ function ThreeStorageScene({ label, subtitle, locations, selectedCell, onSelect,
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setClearColor(0x000000, 0)
     container.appendChild(renderer.domElement)
-    renderer.domElement.className = "size-full cursor-grab active:cursor-grabbing"
+    renderer.domElement.className = "size-full"
 
     const group = new THREE.Group()
     group.rotation.x = 0
@@ -272,10 +272,6 @@ function ThreeStorageScene({ label, subtitle, locations, selectedCell, onSelect,
 
     let frame = 0
     let targetZoom = 1.05
-    let dragging = false
-    let moved = false
-    let lastX = 0
-    let lastY = 0
     let hoveredKey: string | null = null
 
     function resize() {
@@ -302,6 +298,7 @@ function ThreeStorageScene({ label, subtitle, locations, selectedCell, onSelect,
         const old = slotMeshes.get(hoveredKey)
         if (old) setSlotAppearance(old, hoveredKey === `${selectedRef.current?.x}-${selectedRef.current?.y}`, colors)
       }
+      renderer.domElement.style.cursor = key ? "pointer" : "default"
       hoveredKey = key
       if (hoveredKey) {
         const next = slotMeshes.get(hoveredKey)
@@ -316,38 +313,16 @@ function ThreeStorageScene({ label, subtitle, locations, selectedCell, onSelect,
       const hit = raycaster.intersectObjects([...slotMeshes.values()])[0]
       return hit?.object.userData.cell as Cell | undefined
     }
-    function handlePointerDown(event: PointerEvent) {
-      dragging = true
-      moved = false
-      lastX = event.clientX
-      lastY = event.clientY
-      renderer.domElement.setPointerCapture(event.pointerId)
-    }
     function handlePointerMove(event: PointerEvent) {
       const cell = pointerCell(event)
       setHover(cell ? `${cell.x}-${cell.y}` : null)
       onHoverRef.current(cell ?? null)
-      if (!dragging) return
-      const deltaX = event.clientX - lastX
-      const deltaY = event.clientY - lastY
-      if (Math.abs(deltaX) + Math.abs(deltaY) > 2) moved = true
-      // Keep the isometric elevation fixed. Horizontal drag rotates the box
-      // around its vertical axis without introducing a skewed perspective.
-      group.rotation.y += deltaX * 0.004
-      lastX = event.clientX
-      lastY = event.clientY
     }
     function handlePointerLeave() {
-      if (dragging) return
       setHover(null)
       onHoverRef.current(null)
     }
-    function handlePointerUp(event: PointerEvent) {
-      dragging = false
-      renderer.domElement.releasePointerCapture(event.pointerId)
-    }
     function handleClick(event: MouseEvent) {
-      if (moved) return
       const cell = pointerCell(event)
       onSelectRef.current(cell ?? null)
     }
@@ -356,10 +331,8 @@ function ThreeStorageScene({ label, subtitle, locations, selectedCell, onSelect,
       targetZoom = THREE.MathUtils.clamp(targetZoom - event.deltaY * 0.001, 0.72, 1.75)
     }
 
-    renderer.domElement.addEventListener("pointerdown", handlePointerDown)
     renderer.domElement.addEventListener("pointermove", handlePointerMove)
     renderer.domElement.addEventListener("pointerleave", handlePointerLeave)
-    renderer.domElement.addEventListener("pointerup", handlePointerUp)
     renderer.domElement.addEventListener("click", handleClick)
     renderer.domElement.addEventListener("wheel", handleWheel, { passive: false })
     const observer = new ResizeObserver(resize)
@@ -427,10 +400,8 @@ function ThreeStorageScene({ label, subtitle, locations, selectedCell, onSelect,
       cancelAnimationFrame(frame)
       themeObserver.disconnect()
       observer.disconnect()
-      renderer.domElement.removeEventListener("pointerdown", handlePointerDown)
       renderer.domElement.removeEventListener("pointermove", handlePointerMove)
       renderer.domElement.removeEventListener("pointerleave", handlePointerLeave)
-      renderer.domElement.removeEventListener("pointerup", handlePointerUp)
       renderer.domElement.removeEventListener("click", handleClick)
       renderer.domElement.removeEventListener("wheel", handleWheel)
       renderer.dispose()
@@ -477,7 +448,6 @@ export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { ite
     const boxMaps = new Map<string, Map<string, ComponentItem[]>>()
     for (const candidate of boxes) boxMaps.set(candidate.id, new Map())
     for (const item of items) {
-      if (item.quantity <= 0) continue
       const parsed = parseLocation(item.location)
       if (!parsed) continue
       const map = boxMaps.get(parsed.boxId)
@@ -571,7 +541,7 @@ export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { ite
             <h3 id="location-map-title" className="text-sm font-semibold">收纳盒总览</h3>
             <Badge variant="outline" className="font-mono text-[10px] font-normal">7 × 8 · 3D</Badge>
           </div>
-          <p className="mt-1.5 pl-6 text-xs text-muted-foreground">拖动旋转，滚轮缩放；点击空位快速录入，点击已占用货位修改库存。</p>
+          <p className="mt-1.5 pl-6 text-xs text-muted-foreground">滚轮缩放；点击空位快速录入，点击已占用货位修改库存。</p>
         </div>
         <div className="-mx-2 flex min-w-0 items-center justify-end overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <Button type="button" variant="ghost" size="icon" aria-label="上一个元件盒" title="上一个元件盒" onClick={() => carouselApi?.scrollPrev()} disabled={boxes.length <= 1} className="size-11 shrink-0 cursor-pointer"><ChevronLeftIcon /></Button>
@@ -666,7 +636,7 @@ export function InventoryLocationMap({ items, boxes: incomingBoxes = [] }: { ite
           ) : null}
         </div>
       </Carousel>
-      <AddComponentDialog categories={categories} open={entryOpen} onOpenChange={setEntryOpen} initialLocation={entryLocation} locationReadOnly showTrigger={false} />
+      <AddComponentDialog categories={categories} items={items} open={entryOpen} onOpenChange={setEntryOpen} initialLocation={entryLocation} locationReadOnly showTrigger={false} />
       <UpdateStockQuantityDrawer items={selectedItems} location={selectedCell ? locationFor(selectedCell) : ""} open={quantityOpen} onOpenChange={setQuantityOpen} />
       <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
         <DialogContent>

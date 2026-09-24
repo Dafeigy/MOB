@@ -1,7 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import { NavigationLink as Link } from "@/components/navigation-link"
-import { AlertTriangleIcon, ArrowRightIcon, CheckCircle2Icon } from "lucide-react"
+import { useInventoryActions, actionError } from "@/components/inventory-actions"
+import { AlertTriangleIcon, ArrowRightIcon, CheckCircle2Icon, LoaderCircleIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,6 +13,9 @@ import type { ComponentItem } from "@/lib/inventory-types"
 
 
 export function AlertsView({ items }: { items: ComponentItem[] }) {
+  const actions = useInventoryActions()
+  const [pendingId, setPendingId] = useState<string | null>(null)
+  const [error, setError] = useState<{ itemId: string; message: string } | null>(null)
   const lowStock = items
     .filter((item) => item.min_quantity !== null && item.quantity <= item.min_quantity)
     .sort(
@@ -53,7 +58,40 @@ export function AlertsView({ items }: { items: ComponentItem[] }) {
                     <p className="mt-2 text-xs text-muted-foreground">
                       货位 {item.location || "未设置"} · 建议补充至少 {Math.max(minimum * 2 - item.quantity, minimum)} pcs
                     </p>
+                    {error?.itemId === item.id ? <p role="alert" className="mt-2 text-sm text-destructive">{error.message}</p> : null}
                   </div>
+                  {item.quantity === 0 && item.min_quantity !== null ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                      disabled={pendingId === item.id}
+                      onClick={async () => {
+                        setPendingId(item.id)
+                        setError(null)
+                        try {
+                          await actions.updateComponent(item.id, {
+                            name: item.name,
+                            category: item.category,
+                            package: item.package,
+                            value: item.value,
+                            quantity: item.quantity,
+                            minQuantity: "",
+                            location: item.location,
+                            notes: item.notes,
+                            unitPrice: item.unit_price ?? "",
+                          })
+                        } catch (cause) {
+                          setError({ itemId: item.id, message: actionError(cause) })
+                        } finally {
+                          setPendingId(null)
+                        }
+                      }}
+                    >
+                      {pendingId === item.id ? <LoaderCircleIcon className="animate-spin" /> : null}
+                      不再提醒
+                    </Button>
+                  ) : null}
                   <Button nativeButton={false} variant="outline" size="sm" render={<Link href="/movements" />} className="cursor-pointer">
                     去入库
                     <ArrowRightIcon data-icon="inline-end" />

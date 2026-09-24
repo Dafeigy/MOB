@@ -9,16 +9,20 @@ import { Button } from "@/components/ui/button"
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { toast } from "sonner"
+import { UpdateStockQuantityDrawer } from "@/components/update-stock-quantity-drawer"
+import type { ComponentItem } from "@/lib/inventory-types"
 
 const defaultCategories = ["电容", "电阻", "电感", "芯片", "其他"]
 const fields = [
   ["name", "元件名称", "例如：贴片电阻", true],
   ["package", "封装", "例如：0603", true],
   ["value", "参数 / 阻容值", "例如：10 kΩ ±1%", false],
-  ["location", "货位", "例如：A-01-03", false],
+  ["location", "货位", "格式：A-01-03", false],
 ] as const
 
-export function AddComponentDialog({ categories, open: controlledOpen, onOpenChange, initialLocation, locationReadOnly = false, showTrigger = true }: { categories: string[]; open?: boolean; onOpenChange?: (open: boolean) => void; initialLocation?: string; locationReadOnly?: boolean; showTrigger?: boolean }) {
+export function AddComponentDialog({ categories, items = [], open: controlledOpen, onOpenChange, initialLocation, locationReadOnly = false, showTrigger = true }: { categories: string[]; items?: ComponentItem[]; open?: boolean; onOpenChange?: (open: boolean) => void; initialLocation?: string; locationReadOnly?: boolean; showTrigger?: boolean }) {
   const actions = useInventoryActions()
   const [internalOpen, setInternalOpen] = useState(false)
   const [pending, setPending] = useState(false)
@@ -26,6 +30,8 @@ export function AddComponentDialog({ categories, open: controlledOpen, onOpenCha
   const [category, setCategory] = useState("")
   const [categoryInput, setCategoryInput] = useState("")
   const [name, setName] = useState("")
+  const [duplicate, setDuplicate] = useState<{ item: ComponentItem; incomingQuantity: number } | null>(null)
+  const [pendingStock, setPendingStock] = useState<{ item: ComponentItem; quantity: number } | null>(null)
   const [nameWasAutoFilled, setNameWasAutoFilled] = useState(false)
   const open = controlledOpen ?? internalOpen
   const options = useMemo(() => Array.from(new Set([...defaultCategories, ...categories])).filter(Boolean), [categories])
@@ -78,10 +84,26 @@ export function AddComponentDialog({ categories, open: controlledOpen, onOpenCha
       setMessage("请选择分类，或输入新分类后按回车确认。")
       return
     }
-    setPending(true)
     setMessage("")
     const data = Object.fromEntries(new FormData(event.currentTarget))
     data.category = category
+    const quantity = Number(data.quantity)
+    const matchingItem = items.find((item) => item.category.trim() === category.trim()
+      && item.name.trim() === name.trim()
+      && item.package.trim() === String(data.package ?? "").trim()
+      && item.value.trim() === String(data.value ?? "").trim())
+    if (matchingItem) {
+      setDuplicate({ item: matchingItem, incomingQuantity: quantity })
+      return
+    }
+
+    const requestedLocation = String(data.location ?? "").trim()
+    if (requestedLocation && items.some((item) => item.location.trim() && sameLocation(item.location, requestedLocation))) {
+      toast.error("该货位已有元件，不能放入。")
+      return
+    }
+
+    setPending(true)
     try {
       await actions.createComponent(data)
       closeDialog(false)
@@ -90,6 +112,18 @@ export function AddComponentDialog({ categories, open: controlledOpen, onOpenCha
     } finally {
       setPending(false)
     }
+  }
+
+  function confirmDuplicate() {
+    if (!duplicate) return
+    if (!Number.isSafeInteger(duplicate.incomingQuantity) || duplicate.incomingQuantity < 0 || duplicate.item.quantity + duplicate.incomingQuantity > Number.MAX_SAFE_INTEGER) {
+      setMessage("库存数量超出有效范围，请检查后重试。")
+      setDuplicate(null)
+      return
+    }
+    setPendingStock({ item: duplicate.item, quantity: duplicate.item.quantity + duplicate.incomingQuantity })
+    setDuplicate(null)
+    closeDialog(false)
   }
 
   return (
@@ -143,6 +177,35 @@ export function AddComponentDialog({ categories, open: controlledOpen, onOpenCha
           </DrawerFooter>
         </form>
       </DrawerContent>
+      <Dialog open={duplicate !== null} onOpenChange={(nextOpen) => !nextOpen && setDuplicate(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>元件已在库存中</DialogTitle>
+            <DialogDescription>
+              {duplicate ? `“${duplicate.item.name} · ${duplicate.item.package} · ${duplicate.item.value || "无参数"}”已存在。要将本次入库数量加入该元件库存吗？` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDuplicate(null)}>取消</Button>
+            <Button type="button" onClick={confirmDuplicate}>转为更新库存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {pendingStock ? (
+        <UpdateStockQuantityDrawer
+          items={[pendingStock.item]}
+          location={pendingStock.item.location || "未分配货位"}
+          open
+          initialQuantity={pendingStock.quantity}
+          initialNote="重复元件入库"
+          onOpenChange={(nextOpen) => !nextOpen && setPendingStock(null)}
+        />
+      ) : null}
     </Drawer>
   )
+}
+
+function sameLocation(left: string, right: string) {
+  const normalize = (value: string) => value.trim().toUpperCase().replace(/[\s,]+/g, "-").replace(/-+/g, "-").replace(/(^|-)0+(\d)/g, "$1$2")
+  return normalize(left) === normalize(right)
 }

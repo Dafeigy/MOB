@@ -22,6 +22,7 @@ export const config = {
     "/movements/:path*",
     "/alerts/:path*",
     "/settings/:path*",
+    "/bom/:path*",
     "/waitlist/:path*",
     "/api/components/:path*",
     "/api/movements/:path*",

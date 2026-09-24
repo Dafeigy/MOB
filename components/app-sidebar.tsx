@@ -5,6 +5,7 @@ import {
   AlertTriangleIcon,
   BoxesIcon,
   LayoutDashboardIcon,
+  ListTreeIcon,
   LogOutIcon,
   PackagePlusIcon,
   SettingsIcon,
@@ -29,9 +30,11 @@ import {
 const navigation = [
   { title: "总览", href: "/dashboard", icon: LayoutDashboardIcon },
   { title: "元件库存", href: "/components", icon: BoxesIcon },
+
   { title: "出入库", href: "/movements", icon: PackagePlusIcon },
-  { title: "库存提醒", href: "/alerts", icon: AlertTriangleIcon, badge: "!" },
-  { title: "待开放功能", href: "/waitlist", icon: SparklesIcon, badge: "NEW" },
+  { title: "库存提醒", href: "/alerts", icon: AlertTriangleIcon},
+    { title: "iBOM", href: "/bom", icon: ListTreeIcon, badge: "🚧" },
+  { title: "RetosAI", href: "/waitlist", icon: SparklesIcon, badge: "🚧" },
 ]
 
 export function AppSidebar({ pathname, onLogout, ...props }: React.ComponentProps<typeof Sidebar> & { pathname: string; onLogout?: () => void }) {

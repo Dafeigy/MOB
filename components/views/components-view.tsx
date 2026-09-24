@@ -18,7 +18,7 @@ export function ComponentsView({ items, actions }: { items: ComponentItem[]; act
             共 {items.length} 种元件，按名称、参数、备注或货位快速检索。
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">{actions}<AddComponentDialog categories={categories} /></div>
+        <div className="flex flex-wrap items-center gap-2">{actions}<AddComponentDialog categories={categories} items={items} /></div>
       </section>
       <Card className="overflow-hidden border-border py-0 shadow-xs">
         <InventoryTable items={items} />

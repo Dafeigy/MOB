@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { NavigationProgressProvider } from "@/components/navigation-progress"
+import { Toaster } from "@/components/ui/sonner"
 
 export const metadata: Metadata = {
   title: {
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-svh antialiased">
         <NavigationProgressProvider>
           <TooltipProvider>{children}</TooltipProvider>
+          <Toaster />
         </NavigationProgressProvider>
       </body>
     </html>

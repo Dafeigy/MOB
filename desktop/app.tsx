@@ -7,6 +7,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { WorkspaceHeader } from "@/components/workspace-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { Toaster } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
 import { ComponentsView } from "@/components/views/components-view"
 import { DashboardView } from "@/components/views/dashboard-view"
@@ -94,14 +95,16 @@ export function DesktopApp() {
               : pathname === "/movements" 
                 ? <MovementsView items={snapshot.components} movements={snapshot.movements} /> 
                 : pathname === "/waitlist" 
-                ? <WaitlistView />
-                  : pathname === "/alerts" 
-                  ? <AlertsView items={snapshot.components} /> 
-                    : <>
+                  ? <WaitlistView />
+                  : pathname === "/bom"
+                  ? <WaitlistView />
+                    : pathname === "/alerts" 
+                    ? <AlertsView items={snapshot.components} /> 
+                      : <>
           <ComponentsView items={snapshot.components} actions={syncButtons} />
           {syncMessage ? <p role={syncFailed ? "alert" : "status"} className={`mx-auto mt-3 max-w-[1440px] text-sm ${syncFailed ? "text-destructive" : "text-muted-foreground"}`}>{syncMessage}</p> : null}
         </>}
       </main></SidebarInset>
-    </SidebarProvider></TooltipProvider></InventoryActionsContext.Provider></NavigationLinkContext.Provider>
+    </SidebarProvider><Toaster /></TooltipProvider></InventoryActionsContext.Provider></NavigationLinkContext.Provider>
   )
 }

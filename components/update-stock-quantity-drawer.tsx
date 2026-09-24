@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 
 import { actionError, useInventoryActions } from "@/components/inventory-actions"
@@ -11,35 +11,28 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { ComponentItem } from "@/lib/inventory-types"
 
-export function UpdateStockQuantityDrawer({ items, location, open, onOpenChange }: {
+export function UpdateStockQuantityDrawer({ items, location, open, onOpenChange, initialQuantity, initialNote = "" }: {
   items: ComponentItem[]
   location: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialQuantity?: number
+  initialNote?: string
 }) {
   const actions = useInventoryActions()
   const [selectedId, setSelectedId] = useState(items[0]?.id ?? "")
-  const [quantity, setQuantity] = useState(String(items[0]?.quantity ?? 0))
-  const [note, setNote] = useState("")
+  const [quantity, setQuantity] = useState(String(initialQuantity ?? items[0]?.quantity ?? 0))
+  const [note, setNote] = useState(initialNote)
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState("")
   const selectedItem = items.find((item) => item.id === selectedId) ?? items[0]
-
-  useEffect(() => {
-    if (!open) return
-    const first = items[0]
-    setSelectedId(first?.id ?? "")
-    setQuantity(String(first?.quantity ?? 0))
-    setNote("")
-    setMessage("")
-  }, [open, items])
 
   function changeOpen(nextOpen: boolean) {
     if (nextOpen) {
       const first = items[0]
       setSelectedId(first?.id ?? "")
-      setQuantity(String(first?.quantity ?? 0))
-      setNote("")
+      setQuantity(String(initialQuantity ?? first?.quantity ?? 0))
+      setNote(initialNote)
     } else {
       setMessage("")
     }
