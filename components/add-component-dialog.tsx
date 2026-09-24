@@ -25,12 +25,33 @@ export function AddComponentDialog({ categories }: { categories: string[] }) {
   const [message, setMessage] = useState("")
   const [category, setCategory] = useState("")
   const [categoryInput, setCategoryInput] = useState("")
+  const [name, setName] = useState("")
+  const [nameWasAutoFilled, setNameWasAutoFilled] = useState(false)
   const options = useMemo(() => Array.from(new Set([...defaultCategories, ...categories])).filter(Boolean), [categories])
+
+  const autoNameCategories = new Set(["电阻", "电容", "电感"])
 
   function selectCategory(nextCategory: string) {
     setCategory(nextCategory)
     setCategoryInput("")
     setMessage("")
+
+    if (autoNameCategories.has(nextCategory)) {
+      setName(nextCategory)
+      setNameWasAutoFilled(true)
+    } else if (nameWasAutoFilled) {
+      setName("")
+      setNameWasAutoFilled(false)
+    }
+  }
+
+  function changeName(nextName: string) {
+    setName(nextName)
+    if (autoNameCategories.has(category) && nextName !== category) {
+      setCategory("其他")
+      setMessage("已修改元件名称，分类已自动调整为“其他”。")
+    }
+    setNameWasAutoFilled(false)
   }
 
   function addTypedCategory() {
@@ -44,6 +65,8 @@ export function AddComponentDialog({ categories }: { categories: string[] }) {
       setMessage("")
       setCategory("")
       setCategoryInput("")
+      setName("")
+      setNameWasAutoFilled(false)
     }
   }
 
@@ -82,7 +105,7 @@ export function AddComponentDialog({ categories }: { categories: string[] }) {
               <div className="rounded-2xl border bg-input/20 p-3 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/30">
                 <div className="flex flex-wrap gap-2">
                   {options.map((option) => (
-                    <Button key={option} type="button" variant={category === option ? "default" : "outline"} size="xs" onClick={() => selectCategory(option)} className="cursor-pointer">
+                    <Button key={option} type="button" variant={category === option ? "default" : "outline"} size="xs" aria-pressed={category === option} onClick={() => selectCategory(option)} className="cursor-pointer">
                       {option}
                     </Button>
                   ))}
@@ -98,12 +121,12 @@ export function AddComponentDialog({ categories }: { categories: string[] }) {
                   aria-describedby="category-help"
                 />
               </div>
-              <p id="category-help" className="text-xs text-muted-foreground">单选。可选已有 Tag，或输入新 Tag 后按回车。</p>
+              <p id="category-help" className="text-xs text-muted-foreground">单选。选择电阻、电容或电感会自动带入名称；修改名称后分类会改为“其他”。</p>
             </div>
-            {fields.map(([name, label, placeholder, required]) => (
-              <div key={name} className="space-y-2">
-                <Label htmlFor={name}>{label} {required ? <span className="text-destructive">*</span> : null}</Label>
-                <Input id={name} name={name} placeholder={placeholder} required={required} />
+            {fields.map(([fieldName, label, placeholder, required]) => (
+              <div key={fieldName} className="space-y-2">
+                <Label htmlFor={fieldName}>{label} {required ? <span className="text-destructive">*</span> : null}</Label>
+                <Input id={fieldName} name={fieldName} value={fieldName === "name" ? name : undefined} placeholder={placeholder} required={required} onChange={fieldName === "name" ? (event) => changeName(event.target.value) : undefined} />
               </div>
             ))}
             <div className="space-y-2"><Label htmlFor="quantity">初始库存</Label><Input id="quantity" name="quantity" type="number" min="0" step="1" defaultValue="0" required /></div>
